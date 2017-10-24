@@ -1,0 +1,38 @@
+#
+z    = 4        ! ladunek
+norb = 2        ! liczba orbitali
+calc = fccd
+eta=11
+6 5 4 3 2 1 0 -1 -2 -3 -100
+exponents=2
+  1 :      1.139
+  2 :      6.377
+
+orbs=common
+primitives=2
+1 | 7
+2 | 7
+end
+
+pairs=common
+primitives=3
+1,1 | 1 : 3
+1,2 | 1 : 3
+2,2 | 1 : 3
+end
+
+int3 = Q
+print = 5
+!simthr = 1e-4
+!redthr = 1e-4
+scfthr = 1.e-18
+scfcnt = 32
+scfmaxit = 250
+energthr = 1.e-13
+energmaxit = 100
+diverthr = 5
+!optthrmlt = 1.e-1
+!optstepmlt = 1.e-3
+!optlinmlt = 1.1
+!optnormthr = 1.e-6
+end
