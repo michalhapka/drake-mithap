@@ -1,1 +1,2 @@
 ./configure FC=/home/mitek/programy/gcc-4.9.2/install/bin/gfortran CXX=/home/mitek/programy/gcc-4.9.2/install/bin/g++ --prefix=/home/mitek/AA/geminal_slater/program/other/qdlib
+./configure FC=/home/mitek/programy/gcc-7.1.0/install/bin/gfortran CXX=/home/mitek/programy/gcc-7.1.0/install/bin/g++ LDFLAGS="-Wl,-rpath -Wl,/home/mitek/programy/gcc-7.1.0/install/lib64" --prefix=/home/mitek/AA/geminal_slater/drake-mithap/other/qdlib

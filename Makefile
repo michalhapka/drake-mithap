@@ -1,12 +1,12 @@
-COMPILER = /home/mitek/programy/gcc-4.9.2/install
+COMPILER = /home/mitek/programy/gcc-7.1.0/install
 F90      = $(COMPILER)/bin/gfortran
 CXX      = $(COMPILER)/bin/g++
-FFLAG    = -I../program/other/qdlib/include/qd
-LFLAG    = -L../program/other/qdlib/lib -lqd_f_main -lqdmod -lqd \
+FFLAG    = -Iother/qdlib/include/qd
+LFLAG    = -Lother/qdlib/lib -lqd_f_main -lqdmod -lqd \
            -L$(COMPILER)/lib64 -lgfortran -lquadmath \
            -Wl,-rpath -Wl,$(COMPILER)/lib64
-OPTIONS  = -fcheck=all -Wall -Wextra -Warray-temporaries -Wrealloc-lhs-all -pedantic -std=f2008
-#OPTIONS = -O3
+#OPTIONS  = -fcheck=all -Wall -Wextra -Warray-temporaries -Wrealloc-lhs-all -pedantic -std=f2008
+OPTIONS = -O3
 
 NAME = drake
 OBJ  = file_INOUT.o precision.o precision_qd.o misc.o memory.o time.o \
