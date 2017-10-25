@@ -1,6 +1,6 @@
 #!/bin/bash
 
-threelQ=/home/mitek/AA/geminal_slater/drake-mithap/other/Quch/threel
+threelQ=/home/hapka/Programs/drake-mithap/other/Quch/threel
 
 case $1 in
 "L")

@@ -1,10 +1,8 @@
-COMPILER = /home/mitek/programy/gcc-7.1.0/install
-F90      = $(COMPILER)/bin/gfortran
-CXX      = $(COMPILER)/bin/g++
+F90      = gfortran
+CXX      = g++
 FFLAG    = -Iother/qdlib/include/qd
 LFLAG    = -Lother/qdlib/lib -lqd_f_main -lqdmod -lqd \
-           -L$(COMPILER)/lib64 -lgfortran -lquadmath \
-           -Wl,-rpath -Wl,$(COMPILER)/lib64
+           -lgfortran -lquadmath 
 #OPTIONS  = -fcheck=all -Wall -Wextra -Warray-temporaries -Wrealloc-lhs-all -pedantic -std=f2008
 OPTIONS = -O3
 
