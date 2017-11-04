@@ -23,13 +23,14 @@ $(NAME) : $(OBJ)
 	$(F90) -c $(OPTIONS) $(FFLAG) $<
 
 precision_qd.o   : precision.o
+angmom.o         : file_INOUT.o
 memory.o         : file_INOUT.o precision.o
 time.o           : file_INOUT.o precision.o
 eproblem.o       : file_INOUT.o precision.o memory.o
 eproblem_qd.o    : file_INOUT.o precision.o precision_qd.o memory.o
 lproblem.o       : file_INOUT.o precision.o memory.o
 lproblem_qd.o    : file_INOUT.o precision.o precision_qd.o memory.o
-commontypes.o    : file_INOUT.o precision.o memory.o
+commontypes.o    : file_INOUT.o precision.o memory.o angmom.o
 inputread.o      : file_INOUT.o precision.o misc.o memory.o commontypes.o \
                    angmom.o
 systemdef.o      : file_INOUT.o precision.o misc.o memory.o commontypes.o
