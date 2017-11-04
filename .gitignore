@@ -3,4 +3,6 @@ gm
 *.o
 *.f90#
 *.f90~
+intJ*
+intK*
 

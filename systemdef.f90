@@ -33,395 +33,396 @@ character(2) :: sepspace
 logical :: written
 integer :: i,j,k
 
-post_SCF = (index(Input%calc_type,'SCF')==0)
-optimize = (index(Input%calc_type,'OPT')/=0)
-
-select case(trim(Input%orbs_basis))
-case('COMMON')
-   common_orbs = .true.
-   n_orbs = 1
-case('SEPARATE')
-   common_orbs = .false.
-   n_orbs = Input%norb
-   if(n_orbs/=2) then
-      write(LOUT,'(a)') &
-           'ERROR!!! Separate SCF orbitals possible only for norb = 2 !'
-      stop
-   endif
-case default
-   write(LOUT,'(a)') 'Unrecognizable type of orbital basis set: &
-        &creating system data!'
-   stop
-end select
-
-if(post_SCF) then
-   select case(trim(Input%pairs_basis))
-   case('COMMON')
-      common_pairs = .true.
-      n_pairs = 1
-   case('SEPARATE')
-      common_pairs = .false.
-      n_pairs = Input%norb
-   case default
-      write(LOUT,'(a)') 'Unrecognizable type of pairs basis set: &
-           &creating system data!'
-      stop
-   end select
-else
-   common_pairs = .true.
-   n_pairs = 0
-endif
-
-if(post_SCF) then
-   if(optimize) then
-      if(Input%Neta>1) then
-         write(LOUT,'(a)') 'WARNING!!! &
-              &In post SCF optimizations &
-              &only the smallest eta value will be used!'
-      endif
-      Neta = 1
-   else
-      Neta = Input%Neta
-   endif
-else
-   Neta = 0
-endif
-
-Nexp_orig = Input%Nexponents
-
-call mem_alloc(exp_reorder,Nexp_orig)
-
-call mem_alloc(isUsed_orbs ,Nexp_orig)
-call mem_alloc(isUsed_pairs,Nexp_orig)
-call mem_alloc(isUsed      ,Nexp_orig)
-call mem_alloc(isOpt_orbs  ,Nexp_orig)
-call mem_alloc(isOpt_pairs ,Nexp_orig)
-
-maxprim_orbs = 0
-sumprim_orbs = 0
-isUsed_orbs  = .false.
-do j=1,n_orbs
-   associate(OrbInput => Input%OrbInput(j))
-
-     nprim_orbs = OrbInput%Nprimitives
-     if(nprim_orbs<1) then
-        write(LOUT,'(a)') 'Every orbital should be specified!'
-        stop
-     endif
-
-     maxprim_orbs = max(maxprim_orbs,nprim_orbs)
-     sumprim_orbs = sumprim_orbs + nprim_orbs
-
-     do i=1,nprim_orbs
-        isUsed_orbs(OrbInput%orb_control(1,i)) = .true.
-     enddo
-
-   end associate
-enddo
-
-maxprim_pairs = 0
-sumprim_pairs = 0
-isUsed_pairs  = .false.
-if(post_SCF) then
-   do k=1,n_pairs
-      do j=1,n_pairs
-         associate(PairInput => Input%PairInput(j,k))
-
-           if(PairInput%mult<0) cycle
-
-           nprim_pairs = PairInput%Nprimitives
-
-           maxprim_pairs = max(maxprim_pairs,nprim_pairs)
-           sumprim_pairs = sumprim_pairs + nprim_pairs
-
-           do i=1,nprim_pairs
-              isUsed_pairs(PairInput%pair_control(1,i)) = .true.
-              isUsed_pairs(PairInput%pair_control(2,i)) = .true.
-           enddo
-
-         end associate
-      enddo
-   enddo
-   if(maxprim_pairs<1) then
-      write(LOUT,'(a)') 'At least one pair should be specified!'
-      stop
-   endif
-endif
-
-isOpt_orbs  = .false.
-isOpt_pairs = .false.
-if(optimize) then
-   if(post_SCF) then
-
-      isOpt_pairs(:) = (isUsed_pairs.and.Input%optimized)
-
-      if(.not.any(isOpt_pairs)) then
-         write(LOUT,'(a)') 'No pair exponents to optimize!'
-         stop
-      endif
-
-      isUsed(:) = (isUsed_orbs.and.isOpt_pairs)
-      if(any(isUsed)) then
-         write(LOUT,'()')
-         write(LOUT,'(a)',advance='no') 'Some orbital and &
-              &optimized pair exponents overlap'
-         sepspace = ': '
-         do i=1,Nexp_orig
-            if(isUsed(i)) then
-               write(LOUT,'(a,i3)',advance='no') sepspace,i
-               sepspace = ', '
-            endif
-         enddo
-         write(LOUT,'()')
-         stop
-      endif
-
-   else
-
-      isOpt_orbs(:) = (isUsed_orbs.and.Input%optimized)
-
-      if(.not.any(isOpt_orbs)) then
-         write(LOUT,'(a)') 'No orbital exponents to optimize!'
-         stop
-      endif
-
-   endif
-endif
-
-if(post_SCF) then
-   isUsed(:) = (isUsed_pairs.and..not.isOpt_pairs)
-   isUsed(:) = (isUsed_orbs.or.isUsed)
-else
-   isUsed(:) = (isUsed_orbs.and..not.isOpt_orbs)
-endif
-written = .false.
-do j=2,Nexp_orig
-   do i=1,j-1
-      if(isUsed(i).and.isUsed(j)) then
-         if(abs(Input%exponents(i) - Input%exponents(j))<Control%SIMTHR) then
-            if(.not.written) then
-               write(LOUT,'(a,es10.3,a)') 'ERROR!!! &
-                    &Nonopt exponents are too close to each other &
-                    &(SIMTHR = ',Control%SIMTHR,')'
-               written = .true.
-            endif
-            write(LOUT,'(2i3,5x,2f16.8)') &
-                 i,j,Input%exponents(i),Input%exponents(j)
-         endif
-      endif
-   enddo
-enddo
-if(written) stop
-
-isUsed(:) = (isUsed_orbs.or.isUsed_pairs)
-Nexp = count(isUsed)
-
-if(Nexp/=Nexp_orig) then
-   write(LOUT,'()')
-   write(LOUT,'(a)',advance='no') &
-        'Input exponents that are not used will be ignored'
-   sepspace = ': '
-   do i=1,Nexp_orig
-      if(.not.isUsed(i)) then
-         write(LOUT,'(a,i3)',advance='no') sepspace,i
-         sepspace = ', '
-      endif
-   enddo
-   write(LOUT,'()')
-endif
-
-System%nucZ         = Input%nucZ
-System%norb         = Input%norb
-System%calc_type    = Input%calc_type
-System%post_SCF     = post_SCF
-System%optimize     = optimize
-System%common_orbs  = common_orbs
-System%common_pairs = common_pairs
-System%n_orbs       = n_orbs
-System%n_pairs      = n_pairs
-System%Neta         = Neta
-System%Nexp         = Nexp
-System%NexpSQ       = System%Nexp*(System%Nexp + 1)/2
-
-call init_System(System)
-
-System%eta(:) = Input%eta(Input%Neta-System%Neta+1:Input%Neta)
-
-i=0
-do j=1,Nexp_orig
-   if(isUsed(j)) then
-      i = i + 1
-
-      System%exponents(i)    = Input%exponents(j)
-      System%isUsed_orbs(i)  = isUsed_orbs(j)
-      System%isUsed_pairs(i) = isUsed_pairs(j)
-      System%isOpt_orbs(i)   = isOpt_orbs(j)
-      System%isOpt_pairs(i)  = isOpt_pairs(i)
-
-      exp_reorder(j) = i
-   else
-      exp_reorder(j) = -1
-   endif
-enddo
-if(i/=System%Nexp) then
-   write(LOUT,'(a)') 'ERROR!!! Wrong number of exponents in create_System!'
-   stop
-endif
-
-call mem_dealloc(isOpt_pairs)
-call mem_dealloc(isOpt_orbs)
-call mem_dealloc(isUsed)
-call mem_dealloc(isUsed_pairs)
-call mem_dealloc(isUsed_orbs)
-
-call mem_alloc(prim,2,maxprim_orbs)
-call mem_alloc(prim_all,2,sumprim_orbs)
-call mem_alloc(diff,maxprim_orbs)
-call mem_alloc(diff_all,sumprim_orbs)
-
-sumprim_orbs = 0
-do j=1,System%n_orbs
-   associate(OrbInput => Input%OrbInput(j), &
-        OrbSystem => System%OrbSystem(j))
-
-     nprim_orbs = OrbInput%Nprimitives
-     prim(:,1:nprim_orbs) = OrbInput%orb_control
-     do i=1,nprim_orbs
-        prim(1,i) = exp_reorder(prim(1,i))
-     enddo
-
-     call sort_prim(nprim_orbs,prim,diff,compare_prim_orbs)
-     if(any(diff(1:nprim_orbs)>1)) then
-        write(LOUT,'(a)') &
-             'ERROR!!! Some of the orbital primitives are redefined!'
-        call print_orb_control(nprim_orbs,prim)
-        stop
-     endif
-     if(any(diff(1:nprim_orbs)==0)) then
-        write(LOUT,'(a)') &
-             'ERROR!!! Some of the orbital primitives appear more than once!'
-        call print_orb_control(nprim_orbs,prim)
-        stop
-     endif
-
-     call create_OrbSystem(OrbSystem,nprim_orbs,prim)
-
-     prim_all(:,sumprim_orbs+1:sumprim_orbs+nprim_orbs) = &
-          prim(:,1:nprim_orbs)
-     sumprim_orbs = sumprim_orbs + nprim_orbs
-
-   end associate
-enddo
-
-call sort_prim(sumprim_orbs,prim_all,diff_all,compare_prim_orbs)
-call reduce_prim(sumprim_orbs,prim_all,diff_all)
-call create_OrbReduced(System%OrbReduced,sumprim_orbs,prim_all,&
-     System%Nexp,System%isUsed_orbs)
-
-call mem_dealloc(diff_all)
-call mem_dealloc(diff)
-call mem_dealloc(prim_all)
-call mem_dealloc(prim)
-
-if(System%post_SCF) then
-
-   sumprim_pairs = sumprim_pairs + sumprim_orbs*(sumprim_orbs + 1)/2
-
-   call mem_alloc(prim,6,maxprim_pairs)
-   call mem_alloc(prim_all,6,sumprim_pairs)
-   call mem_alloc(diff,maxprim_pairs)
-   call mem_alloc(diff_all,sumprim_pairs)
-
-   call mem_alloc(expSQ_restrict,System%NexpSQ)
-   i = 0
-   do k=1,System%Nexp
-      do j=1,k
-         i = i + 1
-         expSQ_restrict(i) = &
-              (abs(System%exponents(j) - System%exponents(k))<Control%REDTHR)
-      enddo
-   enddo
-   if(i/=System%NexpSQ) then
-      write(LOUT,'(a)') 'ERROR!!! &
-           &Wrong number of exponents(SQ) in create_System!'
-      stop
-   endif
-
-   sumprim_pairs = 0
-   do k=1,System%n_pairs
-      do j=1,System%n_pairs
-         associate(PairInput => Input%PairInput(j,k), &
-              PairSystem => System%PairSystem(j,k))
-
-           PairSystem%mult = PairInput%mult
-
-           if(PairSystem%mult<0) cycle
-
-           write(LOUT,'(a,2(i3,a),a)') 'Processing pair: ',&
-                min(j,k),', ',max(j,k),', ',possible_mult(PairSystem%mult)
-
-           nprim_pairs = PairInput%Nprimitives
-           prim(:,1:nprim_pairs) = PairInput%pair_control
-           do i=1,nprim_pairs
-              prim(1,i) = exp_reorder(prim(1,i))
-              prim(2,i) = exp_reorder(prim(2,i))
-           enddo
-
-           call sort_prim(nprim_pairs,prim,diff,compare_prim_pairs)
-           if(any(diff(1:nprim_pairs)>2)) then
-              write(LOUT,'(a)') &
-                   'ERROR!!! Some of the pair primitives are redefined!'
-              call print_pair_control(nprim_pairs,prim)
-              stop
-           endif
-           if(any(diff(1:nprim_pairs)==0)) then
-              write(LOUT,'(a)') &
-                   'ERROR!!! Some of the pair primitives appear more than once!'
-              call print_pair_control(nprim_pairs,prim)
-              stop
-           endif
-
-           call create_PairSystem(PairSystem,nprim_pairs,prim,&
-                diff,expSQ_restrict)
-           call check_PairSystem(PairSystem)
-
-           prim_all(:,sumprim_pairs+1:sumprim_pairs+nprim_pairs) = &
-                prim(:,1:nprim_pairs)
-           sumprim_pairs = sumprim_pairs + nprim_pairs
-
-         end associate
-      enddo
-   enddo
-
-   call sort_prim(sumprim_pairs,prim_all,diff_all,compare_prim_pairs)
-   call reduce_prim(sumprim_pairs,prim_all,diff_all)
-   call create_PairReduced(System%PairReduced,&
-        sumprim_pairs,prim_all,diff_all,System%Nexp,System%isUsed_pairs)
-
-   call add_OrbReduced(sumprim_pairs,prim_all,System%Nexp,System%OrbReduced)
-   call sort_prim(sumprim_pairs,prim_all,diff_all,compare_prim_pairs)
-   call reduce_prim(sumprim_pairs,prim_all,diff_all)
-   call create_PairReduced(System%OrbPairReduced,&
-        sumprim_pairs,prim_all,diff_all,0,isUsed)
-
-   call check_consistency_PairReduced(System%NexpSQ,&
-        System%OrbPairReduced,System%PairReduced)
-
-   call mem_dealloc(expSQ_restrict)
-
-   call mem_dealloc(diff_all)
-   call mem_dealloc(diff)
-   call mem_dealloc(prim_all)
-   call mem_dealloc(prim)
-
-endif
-
-call mem_dealloc(exp_reorder)
-
-call print_System(System,Control%LPRINT)
-
-call print_EndSection
-
+! post_SCF = (index(Input%calc_type,'SCF')==0)
+! optimize = (index(Input%calc_type,'OPT')/=0)
+! 
+! select case(trim(Input%orbs_basis))
+! case('COMMON')
+!    common_orbs = .true.
+!    n_orbs = 1
+! case('SEPARATE')
+!    common_orbs = .false.
+!    n_orbs = Input%norb
+!    if(n_orbs/=2) then
+!       write(LOUT,'(a)') &
+!            'ERROR!!! Separate SCF orbitals possible only for norb = 2 !'
+!       stop
+!    endif
+! case default
+!    write(LOUT,'(a)') 'Unrecognizable type of orbital basis set: &
+!         &creating system data!'
+!    stop
+! end select
+! 
+! if(post_SCF) then
+!    select case(trim(Input%pairs_basis))
+!    case('COMMON')
+!       common_pairs = .true.
+!       n_pairs = 1
+!    case('SEPARATE')
+!       common_pairs = .false.
+!       n_pairs = Input%norb
+!    case default
+!       write(LOUT,'(a)') 'Unrecognizable type of pairs basis set: &
+!            &creating system data!'
+!       stop
+!    end select
+! else
+!    common_pairs = .true.
+!    n_pairs = 0
+! endif
+! 
+! if(post_SCF) then
+!    if(optimize) then
+!       if(Input%Neta>1) then
+!          write(LOUT,'(a)') 'WARNING!!! &
+!               &In post SCF optimizations &
+!               &only the smallest eta value will be used!'
+!       endif
+!       Neta = 1
+!    else
+!       Neta = Input%Neta
+!    endif
+! else
+!    Neta = 0
+! endif
+! 
+! Nexp_orig = Input%Nexponents
+! 
+! call mem_alloc(exp_reorder,Nexp_orig)
+! 
+! call mem_alloc(isUsed_orbs ,Nexp_orig)
+! call mem_alloc(isUsed_pairs,Nexp_orig)
+! call mem_alloc(isUsed      ,Nexp_orig)
+! call mem_alloc(isOpt_orbs  ,Nexp_orig)
+! call mem_alloc(isOpt_pairs ,Nexp_orig)
+! 
+! maxprim_orbs = 0
+! sumprim_orbs = 0
+! isUsed_orbs  = .false.
+! do j=1,n_orbs
+!    associate(OrbInput => Input%OrbInput(j))
+! 
+!      nprim_orbs = OrbInput%Nprimitives
+!      if(nprim_orbs<1) then
+!         write(LOUT,'(a)') 'Every orbital should be specified!'
+!         stop
+!      endif
+! 
+!      maxprim_orbs = max(maxprim_orbs,nprim_orbs)
+!      sumprim_orbs = sumprim_orbs + nprim_orbs
+! 
+!      do i=1,nprim_orbs
+!         isUsed_orbs(OrbInput%orb_control(1,i)) = .true.
+!      enddo
+! 
+!    end associate
+! enddo
+! 
+! maxprim_pairs = 0
+! sumprim_pairs = 0
+! isUsed_pairs  = .false.
+! if(post_SCF) then
+!    do k=1,n_pairs
+!       do j=1,n_pairs
+!          associate(PairInput => Input%PairInput(j,k))
+! 
+!            if(PairInput%mult<0) cycle
+! 
+!            nprim_pairs = PairInput%Nprimitives
+! 
+!            maxprim_pairs = max(maxprim_pairs,nprim_pairs)
+!            sumprim_pairs = sumprim_pairs + nprim_pairs
+! 
+!            do i=1,nprim_pairs
+!               isUsed_pairs(PairInput%pair_control(1,i)) = .true.
+!               isUsed_pairs(PairInput%pair_control(2,i)) = .true.
+!            enddo
+! 
+!          end associate
+!       enddo
+!    enddo
+!    if(maxprim_pairs<1) then
+!       write(LOUT,'(a)') 'At least one pair should be specified!'
+!       stop
+!    endif
+! endif
+! 
+! isOpt_orbs  = .false.
+! isOpt_pairs = .false.
+! if(optimize) then
+!    if(post_SCF) then
+! 
+!       isOpt_pairs(:) = (isUsed_pairs.and.Input%optimized)
+! 
+!       if(.not.any(isOpt_pairs)) then
+!          write(LOUT,'(a)') 'No pair exponents to optimize!'
+!          stop
+!       endif
+! 
+!       isUsed(:) = (isUsed_orbs.and.isOpt_pairs)
+!       if(any(isUsed)) then
+!          write(LOUT,'()')
+!          write(LOUT,'(a)',advance='no') 'Some orbital and &
+!               &optimized pair exponents overlap'
+!          sepspace = ': '
+!          do i=1,Nexp_orig
+!             if(isUsed(i)) then
+!                write(LOUT,'(a,i3)',advance='no') sepspace,i
+!                sepspace = ', '
+!             endif
+!          enddo
+!          write(LOUT,'()')
+!          stop
+!       endif
+! 
+!    else
+! 
+!       isOpt_orbs(:) = (isUsed_orbs.and.Input%optimized)
+! 
+!       if(.not.any(isOpt_orbs)) then
+!          write(LOUT,'(a)') 'No orbital exponents to optimize!'
+!          stop
+!       endif
+! 
+!    endif
+! endif
+! 
+! if(post_SCF) then
+!    isUsed(:) = (isUsed_pairs.and..not.isOpt_pairs)
+!    isUsed(:) = (isUsed_orbs.or.isUsed)
+! else
+!    isUsed(:) = (isUsed_orbs.and..not.isOpt_orbs)
+! endif
+! written = .false.
+! do j=2,Nexp_orig
+!    do i=1,j-1
+!       if(isUsed(i).and.isUsed(j)) then
+!          if(abs(Input%exponents(i) - Input%exponents(j))<Control%SIMTHR) then
+!             if(.not.written) then
+!                write(LOUT,'(a,es10.3,a)') 'ERROR!!! &
+!                     &Nonopt exponents are too close to each other &
+!                     &(SIMTHR = ',Control%SIMTHR,')'
+!                written = .true.
+!             endif
+!             write(LOUT,'(2i3,5x,2f16.8)') &
+!                  i,j,Input%exponents(i),Input%exponents(j)
+!          endif
+!       endif
+!    enddo
+! enddo
+! if(written) stop
+! 
+! isUsed(:) = (isUsed_orbs.or.isUsed_pairs)
+! Nexp = count(isUsed)
+! 
+! if(Nexp/=Nexp_orig) then
+!    write(LOUT,'()')
+!    write(LOUT,'(a)',advance='no') &
+!         'Input exponents that are not used will be ignored'
+!    sepspace = ': '
+!    do i=1,Nexp_orig
+!       if(.not.isUsed(i)) then
+!          write(LOUT,'(a,i3)',advance='no') sepspace,i
+!          sepspace = ', '
+!       endif
+!    enddo
+!    write(LOUT,'()')
+! endif
+! 
+! System%nucZ         = Input%nucZ
+! System%maxl         = Input%maxl
+! System%norb         = Input%norb
+! System%calc_type    = Input%calc_type
+! System%post_SCF     = post_SCF
+! System%optimize     = optimize
+! System%common_orbs  = common_orbs
+! System%common_pairs = common_pairs
+! System%n_orbs       = n_orbs
+! System%n_pairs      = n_pairs
+! System%Neta         = Neta
+! System%Nexp         = Nexp
+! System%NexpSQ       = System%Nexp*(System%Nexp + 1)/2
+! 
+! call init_System(System)
+! 
+! System%eta(:) = Input%eta(Input%Neta-System%Neta+1:Input%Neta)
+! 
+! i=0
+! do j=1,Nexp_orig
+!    if(isUsed(j)) then
+!       i = i + 1
+! 
+!       System%exponents(i)    = Input%exponents(j)
+!       System%isUsed_orbs(i)  = isUsed_orbs(j)
+!       System%isUsed_pairs(i) = isUsed_pairs(j)
+!       System%isOpt_orbs(i)   = isOpt_orbs(j)
+!       System%isOpt_pairs(i)  = isOpt_pairs(i)
+! 
+!       exp_reorder(j) = i
+!    else
+!       exp_reorder(j) = -1
+!    endif
+! enddo
+! if(i/=System%Nexp) then
+!    write(LOUT,'(a)') 'ERROR!!! Wrong number of exponents in create_System!'
+!    stop
+! endif
+! 
+! call mem_dealloc(isOpt_pairs)
+! call mem_dealloc(isOpt_orbs)
+! call mem_dealloc(isUsed)
+! call mem_dealloc(isUsed_pairs)
+! call mem_dealloc(isUsed_orbs)
+! 
+! call mem_alloc(prim,2,maxprim_orbs)
+! call mem_alloc(prim_all,2,sumprim_orbs)
+! call mem_alloc(diff,maxprim_orbs)
+! call mem_alloc(diff_all,sumprim_orbs)
+! 
+! sumprim_orbs = 0
+! do j=1,System%n_orbs
+!    associate(OrbInput => Input%OrbInput(j), &
+!         OrbSystem => System%OrbSystem(j))
+! 
+!      nprim_orbs = OrbInput%Nprimitives
+!      prim(:,1:nprim_orbs) = OrbInput%orb_control
+!      do i=1,nprim_orbs
+!         prim(1,i) = exp_reorder(prim(1,i))
+!      enddo
+! 
+!      call sort_prim(nprim_orbs,prim,diff,compare_prim_orbs)
+!      if(any(diff(1:nprim_orbs)>1)) then
+!         write(LOUT,'(a)') &
+!              'ERROR!!! Some of the orbital primitives are redefined!'
+!         call print_orb_control(nprim_orbs,prim)
+!         stop
+!      endif
+!      if(any(diff(1:nprim_orbs)==0)) then
+!         write(LOUT,'(a)') &
+!              'ERROR!!! Some of the orbital primitives appear more than once!'
+!         call print_orb_control(nprim_orbs,prim)
+!         stop
+!      endif
+! 
+!      call create_OrbSystem(OrbSystem,nprim_orbs,prim)
+! 
+!      prim_all(:,sumprim_orbs+1:sumprim_orbs+nprim_orbs) = &
+!           prim(:,1:nprim_orbs)
+!      sumprim_orbs = sumprim_orbs + nprim_orbs
+! 
+!    end associate
+! enddo
+! 
+! call sort_prim(sumprim_orbs,prim_all,diff_all,compare_prim_orbs)
+! call reduce_prim(sumprim_orbs,prim_all,diff_all)
+! call create_OrbReduced(System%OrbReduced,sumprim_orbs,prim_all,&
+!      System%Nexp,System%isUsed_orbs)
+! 
+! call mem_dealloc(diff_all)
+! call mem_dealloc(diff)
+! call mem_dealloc(prim_all)
+! call mem_dealloc(prim)
+! 
+! if(System%post_SCF) then
+! 
+!    sumprim_pairs = sumprim_pairs + sumprim_orbs*(sumprim_orbs + 1)/2
+! 
+!    call mem_alloc(prim,6,maxprim_pairs)
+!    call mem_alloc(prim_all,6,sumprim_pairs)
+!    call mem_alloc(diff,maxprim_pairs)
+!    call mem_alloc(diff_all,sumprim_pairs)
+! 
+!    call mem_alloc(expSQ_restrict,System%NexpSQ)
+!    i = 0
+!    do k=1,System%Nexp
+!       do j=1,k
+!          i = i + 1
+!          expSQ_restrict(i) = &
+!               (abs(System%exponents(j) - System%exponents(k))<Control%REDTHR)
+!       enddo
+!    enddo
+!    if(i/=System%NexpSQ) then
+!       write(LOUT,'(a)') 'ERROR!!! &
+!            &Wrong number of exponents(SQ) in create_System!'
+!       stop
+!    endif
+! 
+!    sumprim_pairs = 0
+!    do k=1,System%n_pairs
+!       do j=1,System%n_pairs
+!          associate(PairInput => Input%PairInput(j,k), &
+!               PairSystem => System%PairSystem(j,k))
+! 
+!            PairSystem%mult = PairInput%mult
+! 
+!            if(PairSystem%mult<0) cycle
+! 
+!            write(LOUT,'(a,2(i3,a),a)') 'Processing pair: ',&
+!                 min(j,k),', ',max(j,k),', ',possible_mult(PairSystem%mult)
+! 
+!            nprim_pairs = PairInput%Nprimitives
+!            prim(:,1:nprim_pairs) = PairInput%pair_control
+!            do i=1,nprim_pairs
+!               prim(1,i) = exp_reorder(prim(1,i))
+!               prim(2,i) = exp_reorder(prim(2,i))
+!            enddo
+! 
+!            call sort_prim(nprim_pairs,prim,diff,compare_prim_pairs)
+!            if(any(diff(1:nprim_pairs)>2)) then
+!               write(LOUT,'(a)') &
+!                    'ERROR!!! Some of the pair primitives are redefined!'
+!               call print_pair_control(nprim_pairs,prim)
+!               stop
+!            endif
+!            if(any(diff(1:nprim_pairs)==0)) then
+!               write(LOUT,'(a)') &
+!                    'ERROR!!! Some of the pair primitives appear more than once!'
+!               call print_pair_control(nprim_pairs,prim)
+!               stop
+!            endif
+! 
+!            call create_PairSystem(PairSystem,nprim_pairs,prim,&
+!                 diff,expSQ_restrict)
+!            call check_PairSystem(PairSystem)
+! 
+!            prim_all(:,sumprim_pairs+1:sumprim_pairs+nprim_pairs) = &
+!                 prim(:,1:nprim_pairs)
+!            sumprim_pairs = sumprim_pairs + nprim_pairs
+! 
+!          end associate
+!       enddo
+!    enddo
+! 
+!    call sort_prim(sumprim_pairs,prim_all,diff_all,compare_prim_pairs)
+!    call reduce_prim(sumprim_pairs,prim_all,diff_all)
+!    call create_PairReduced(System%PairReduced,&
+!         sumprim_pairs,prim_all,diff_all,System%Nexp,System%isUsed_pairs)
+! 
+!    call add_OrbReduced(sumprim_pairs,prim_all,System%Nexp,System%OrbReduced)
+!    call sort_prim(sumprim_pairs,prim_all,diff_all,compare_prim_pairs)
+!    call reduce_prim(sumprim_pairs,prim_all,diff_all)
+!    call create_PairReduced(System%OrbPairReduced,&
+!         sumprim_pairs,prim_all,diff_all,0,isUsed)
+! 
+!    call check_consistency_PairReduced(System%NexpSQ,&
+!         System%OrbPairReduced,System%PairReduced)
+! 
+!    call mem_dealloc(expSQ_restrict)
+! 
+!    call mem_dealloc(diff_all)
+!    call mem_dealloc(diff)
+!    call mem_dealloc(prim_all)
+!    call mem_dealloc(prim)
+! 
+! endif
+! 
+! call mem_dealloc(exp_reorder)
+! 
+! call print_System(System,Control%LPRINT)
+! 
+! call print_EndSection
+! 
 end subroutine create_System
 
 subroutine sort_prim(n,prim,diff,compare_prim)

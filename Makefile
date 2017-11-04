@@ -10,6 +10,7 @@ NAME = drake
 OBJ  = file_INOUT.o precision.o precision_qd.o misc.o memory.o time.o \
        eproblem.o eproblem_qd.o lproblem.o lproblem_qd.o \
        commontypes.o inputread.o systemdef.o \
+       angmom.o \
        int12core.o optimizer.o \
        SCFint.o SCFdriver.o CCint2.o CCint3.o CCdriver.o calcdriver.o \
        main.o
@@ -29,7 +30,8 @@ eproblem_qd.o    : file_INOUT.o precision.o precision_qd.o memory.o
 lproblem.o       : file_INOUT.o precision.o memory.o
 lproblem_qd.o    : file_INOUT.o precision.o precision_qd.o memory.o
 commontypes.o    : file_INOUT.o precision.o memory.o
-inputread.o      : file_INOUT.o precision.o misc.o memory.o commontypes.o
+inputread.o      : file_INOUT.o precision.o misc.o memory.o commontypes.o \
+                   angmom.o
 systemdef.o      : file_INOUT.o precision.o misc.o memory.o commontypes.o
 int12core.o      : file_INOUT.o precision.o precision_qd.o
 optimizer.o      : file_INOUT.o precision.o memory.o commontypes.o

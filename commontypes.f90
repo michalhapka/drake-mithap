@@ -56,6 +56,11 @@ integer :: Nprimitives
 integer,allocatable :: orb_control(:,:)
 end type OrbInputData
 
+type OrbInputData_L
+type(OrbInputData),allocatable :: OrbInput(:)
+integer :: lorb
+end type OrbInputData_L
+
 type PairInputData
 integer :: mult
 integer :: Nprimitives
@@ -64,7 +69,9 @@ end type PairInputData
 
 type InputData
 real(prec) :: nucZ
-integer :: norb
+integer, allocatable :: norb(:)
+integer :: maxl
+!integer :: norb
 character(8) :: calc_type
 integer :: Neta
 integer,allocatable :: eta(:)
@@ -72,7 +79,8 @@ integer :: Nexponents
 real(prec),allocatable :: exponents(:)
 logical,allocatable :: optimized(:)
 character(8) :: orbs_basis
-type(OrbInputData),allocatable :: OrbInput(:)
+!type(OrbInputData),allocatable :: OrbInput(:)
+type(OrbInputData_L),allocatable :: OrbInput_L(:)
 character(8) :: pairs_basis
 type(PairInputData),allocatable :: PairInput(:,:)
 character  :: INT3;        logical :: set_INT3
@@ -163,6 +171,8 @@ end type PairReducedData
 type SystemData
 real(prec) :: nucZ
 integer :: norb
+!integer,allocatable :: norb(:)
+integer :: maxl 
 character(8) :: calc_type
 logical :: post_SCF,optimize
 logical :: common_orbs,common_pairs
@@ -212,7 +222,8 @@ implicit none
 type(InputData) :: Input
 
 Input%nucZ        = 0._prec
-Input%norb        = 0
+Input%maxl        = 0
+! Input%norb        = 0
 Input%calc_type   = ''
 Input%Neta        = 0
 Input%Nexponents  = 0
@@ -254,30 +265,50 @@ if(allocated(Input%PairInput)) then
 
 endif
 
-if(allocated(Input%OrbInput)) then
+! hapka-OrbInput
+if(allocated(Input%OrbInput_L)) then
+  do j=1,size(Input%OrbInput_L)
 
-   do i=1,size(Input%OrbInput)
-      call mem_dealloc(Input%OrbInput(i)%orb_control)
-   enddo
-   deallocate(Input%OrbInput)
+     if(allocated(Input%OrbInput_L(j)%OrbInput)) then
+
+        do i=1,size(Input%OrbInput_L(j)%OrbInput)
+           call mem_dealloc(Input%OrbInput_L(j)%OrbInput(i)%orb_control)
+        enddo
+        deallocate(Input%OrbInput_L(j)%OrbInput)
+
+     endif
+  enddo 
 
 endif
+
+!if(allocated(Input%OrbInput)) then
+!
+!   do i=1,size(Input%OrbInput)
+!      call mem_dealloc(Input%OrbInput(i)%orb_control)
+!   enddo
+!   deallocate(Input%OrbInput)
+
+!endif
 
 call mem_dealloc(Input%optimized)
 call mem_dealloc(Input%exponents)
 call mem_dealloc(Input%eta)
+! hapka-norg
+call mem_dealloc(Input%norb)
 
 end subroutine free_Input
 
 subroutine print_Input(Input)
 use misc, only : swap
+use angmom
 implicit none
 type(InputData) :: Input
-integer :: i,j,idx1,idx2
+integer :: i,j,k,idx1,idx2
 
 write(LOUT,'()')
 write(LOUT,'(a,f7.3)') 'Z    = ',Input%nucZ
-write(LOUT,'(a,i3)') 'NORB = ',Input%norb
+write(LOUT,'(a,i3)') 'MAXL = ',Input%maxl
+write(LOUT,'(a,i3,i3)') 'NORB = ',Input%norb
 write(LOUT,'()')
 write(LOUT,'(2a)') 'CALC = ',Input%calc_type
 if(Input%Neta>0) then
@@ -304,20 +335,40 @@ write(LOUT,'(2a)') 'ORBS = ',Input%orbs_basis
 select case(trim(Input%orbs_basis))
 case('COMMON')
 
-   associate(OrbInput => Input%OrbInput(1))
+do i=1,size(Input%OrbInput_L)
+   associate(OrbInput => Input%OrbInput_L(i)%OrbInput(1))
+     write(LOUT,'(2a)') 'LORB = ', get_angmom_name(Input%OrbInput_L(i)%lorb)
      call print_orb_control(OrbInput%Nprimitives,OrbInput%orb_control)
    end associate
+enddo
+
+!   associate(OrbInput => Input%OrbInput(1))
+!     call print_orb_control(OrbInput%Nprimitives,OrbInput%orb_control)
+!   end associate
 
 case('SEPARATE')
+! hapka-norb
 
-   do i=1,Input%norb
-
-      associate(OrbInput => Input%OrbInput(i))
-        write(LOUT,'(a,i3,a)',advance='no') 'ORB = ',i,', '
-        call print_orb_control(OrbInput%Nprimitives,OrbInput%orb_control)
-      end associate
-
+do k=1,size(Input%OrbInput_L)
+   do j=1,Input%maxl+1
+      do i=1,Input%norb(j)
+         associate(OrbInput => Input%OrbInput_L(k)%OrbInput(i))
+           write(LOUT,'(a,i3,a)',advance='no') 'ORB = ',i,', '
+           call print_orb_control(OrbInput%Nprimitives,OrbInput%orb_control)
+         end associate
+   
+      enddo
    enddo
+enddo
+!do j=1,Input%maxl+1
+!   do i=1,Input%norb(j)
+!      associate(OrbInput => Input%OrbInput(i))
+!        write(LOUT,'(a,i3,a)',advance='no') 'ORB = ',i,', '
+!        call print_orb_control(OrbInput%Nprimitives,OrbInput%orb_control)
+!      end associate
+!
+!   enddo
+!enddo
 
 case default
 
@@ -342,8 +393,9 @@ if(index(Input%calc_type,'SCF')==0) then
       end associate
 
    case('SEPARATE')
-
-      do j=1,Input%norb
+! hapka-norb
+do k=1,Input%maxl+1
+      do j=1,Input%norb(k)
          do i=1,j
 
             idx1 = j
@@ -369,6 +421,7 @@ if(index(Input%calc_type,'SCF')==0) then
 
          enddo
       enddo
+enddo
 
    case default
 
@@ -1418,6 +1471,7 @@ write(LOUT,'(5x,a)') '--- Calculation specifications ---'
 
 write(LOUT,'()')
 write(LOUT,'(a,f7.3)') 'Nuclear charge:     ',System%nucZ
+write(LOUT,'(a,i3)') 'Max. ang. momentum: ',System%maxl
 write(LOUT,'(a,i3)') 'Number of orbitals: ',System%norb
 write(LOUT,'(a,3x,a,t35,a)',advance='no') &
      'Calculation type:   ',trim(System%calc_type),'('
