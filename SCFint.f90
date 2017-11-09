@@ -47,12 +47,12 @@ type(OrbReducedData),intent(in) :: OrbReduced(:)
 integer,intent(in) :: LPRINT
 
 call init_OneInt(Nexp)
-call create_OneInt(Nexp,exponents,OrbReduced)
-call print_OneInt(LPRINT)
+!call create_OneInt(Nexp,exponents,OrbReduced)
+!call print_OneInt(LPRINT)
 
-call init_TwoInt(Nexp)
-call create_TwoInt(Nexp,exponents,OrbReduced)
-call print_TwoInt(LPRINT)
+!call init_TwoInt(Nexp)
+!call create_TwoInt(Nexp,exponents,OrbReduced)
+!call print_TwoInt(LPRINT)
 
 end subroutine create_SCFint
 

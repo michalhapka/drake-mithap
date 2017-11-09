@@ -77,30 +77,63 @@ implicit none
 type(SystemData) :: System
 type(ControlData) :: Control
 logical :: fullPRINT
+integer :: i
 
-if(System%common_orbs) then
-   if(System%n_orbs/=1) then
-      write(LOUT,'(a)') 'ERROR!!! Inconsistent data in chooseSCF!'
-      stop
-   endif
+ if(System%common_orbs) then
+    do i=1,System%maxl+1
+       if(System%n_orbs(i)/=1) then
+          write(LOUT,'(a)') 'ERROR!!! Inconsistent data in chooseSCF!'
+          stop
+       endif
+    enddo
+    write(LOUT,*) 'TEST?' 
+!    call SCF_energy_common(System%norb,System%OrbSystem(1),System%OrbReduced,&
+!         Control,fullPRINT)
 
-   call SCF_energy_common(System%norb,System%OrbSystem(1),System%OrbReduced,&
-        Control,fullPRINT)
+  else
+    do i=1,System%maxl+1
+       if(System%n_orbs(i)/=System%norb(i)) then
+          write(LOUT,'(a)') 'ERROR!!! Inconsistent data in chooseSCF!'
+          stop
+       endif
+    enddo
+ 
+    do i=1,System%maxl+1
+       if(System%n_orbs(i)/=2) then
+          write(LOUT,'(a)') 'ERROR!!! Separate SCF orbitals only for norb = 2 !'
+          stop
+       endif
+    enddo
 
-else
-   if(System%n_orbs/=System%norb) then
-      write(LOUT,'(a)') 'ERROR!!! Inconsistent data in chooseSCF!'
-      stop
-   endif
-   if(System%norb/=2) then
-      write(LOUT,'(a)') 'ERROR!!! Separate SCF orbitals only for norb = 2 !'
-      stop
-   endif
+!    call SCF_energy_separate(System%OrbSystem,System%OrbReduced,&
+!         Control,fullPRINT)
 
-   call SCF_energy_separate(System%OrbSystem,System%OrbReduced,&
-        Control,fullPRINT)
+  endif
 
-endif
+! hapka: old_drake
+! if(System%common_orbs) then
+!    if(System%n_orbs/=1) then
+!       write(LOUT,'(a)') 'ERROR!!! Inconsistent data in chooseSCF!'
+!       stop
+!    endif
+! 
+!    call SCF_energy_common(System%norb,System%OrbSystem(1),System%OrbReduced,&
+!         Control,fullPRINT)
+! 
+! else
+!    if(System%n_orbs/=System%norb) then
+!       write(LOUT,'(a)') 'ERROR!!! Inconsistent data in chooseSCF!'
+!       stop
+!    
+!    if(System%norb/=2) then
+!       write(LOUT,'(a)') 'ERROR!!! Separate SCF orbitals only for norb = 2 !'
+!       stop
+!    endif
+! 
+!    call SCF_energy_separate(System%OrbSystem,System%OrbReduced,&
+!         Control,fullPRINT)
+! 
+! endif
 
 end subroutine chooseSCF
 
@@ -123,7 +156,7 @@ integer :: i1,j1,i2,j2,ij2
 
 LPRINT_mod = merge(Control%LPRINT,0,fullPRINT)
 
-nbas = OrbSystem%nbas
+!nbas = OrbSystem%nbas
 
 call mem_alloc(matH,nbas,nbas)
 call mem_alloc(matS,nbas,nbas)
@@ -131,66 +164,66 @@ call mem_alloc(twoel,nbas**2,nbas**2)
 
 call create_SCFint(Nexp,exponents,OrbReduced,LPRINT_mod)
 
-call SCFint_matH(matH,OrbSystem,OrbSystem,nucZ)
-call SCFint_matS(matS,OrbSystem,OrbSystem)
-call SCFint_matJ(twoel,OrbSystem,OrbSystem,OrbSystem,OrbSystem)
+!call SCFint_matH(matH,OrbSystem,OrbSystem,nucZ)
+!call SCFint_matS(matS,OrbSystem,OrbSystem)
+!call SCFint_matJ(twoel,OrbSystem,OrbSystem,OrbSystem,OrbSystem)
 
-call free_SCFint
+!call free_SCFint
 
-call mem_alloc(eval,nbas)
-call mem_alloc(evec,nbas,nbas)
-call mem_alloc(matF,nbas,nbas)
-call mem_alloc(matG,nbas,nbas)
-call mem_alloc(dens,nbas,nbas)
+!call mem_alloc(eval,nbas)
+!call mem_alloc(evec,nbas,nbas)
+!call mem_alloc(matF,nbas,nbas)
+!call mem_alloc(matG,nbas,nbas)
+!call mem_alloc(dens,nbas,nbas)
 
-call Roothaan_iterations(norb,nbas,converged,energy,eval,evec,&
-     matH,matS,twoel,matF,matG,dens,Control,LPRINT_mod)
+!call Roothaan_iterations(norb,nbas,converged,energy,eval,evec,&
+!     matH,matS,twoel,matF,matG,dens,Control,LPRINT_mod)
 
-if(fullPRINT) then
-   write(LOUT,'()')
-   write(LOUT,'(a)') 'Orbital energies'
-   do i=1,norb
-      write(LOUT,'(i5,f25.18)') i,eval(i)
-   enddo
-   write(LOUT,'()')
-   if(converged) then
-      write(LOUT,'(a,f25.18)') '    Converged SCF energy: ',energy
-   else
-      write(LOUT,'(a,f25.18)') 'NOT converged SCF energy: ',energy
-   endif
-endif
-
-RESULT_energy = energy
-
-if(associated(RESULT_extend)) then
-   RESULT_extend%energy = energy
-   RESULT_extend%HOMO = eval(norb)
-   RESULT_extend%LUMO = merge(eval(norb+1),0._prec,nbas>norb)
-   RESULT_extend%orb_energy(1:norb) = eval(1:norb)
-   RESULT_extend%orb_vector(1:nbas,1:norb) = evec(1:nbas,1:norb)
-   ij2 = 0
-   do j2=1,norb
-      do i2=1,j2
-         ij2 = ij2 + 1
-         do j1=1,norb
-            do i1=1,norb
-               RESULT_extend%pair_energy(i1,j1,ij2) = make_contract(&
-                    nbas,RESULT_extend%orb_vector(:,i1),&
-                    nbas,RESULT_extend%orb_vector(:,i2),&
-                    nbas,RESULT_extend%orb_vector(:,j1),&
-                    nbas,RESULT_extend%orb_vector(:,j2),&
-                    twoel,dens)
-            enddo
-         enddo
-      enddo
-   enddo
-endif
-
-call mem_dealloc(dens)
-call mem_dealloc(matG)
-call mem_dealloc(matF)
-call mem_dealloc(evec)
-call mem_dealloc(eval)
+!if(fullPRINT) then
+!   write(LOUT,'()')
+!   write(LOUT,'(a)') 'Orbital energies'
+!   do i=1,norb
+!      write(LOUT,'(i5,f25.18)') i,eval(i)
+!   enddo
+!   write(LOUT,'()')
+!   if(converged) then
+!      write(LOUT,'(a,f25.18)') '    Converged SCF energy: ',energy
+!   else
+!      write(LOUT,'(a,f25.18)') 'NOT converged SCF energy: ',energy
+!   endif
+!endif
+!
+!RESULT_energy = energy
+!
+!if(associated(RESULT_extend)) then
+!   RESULT_extend%energy = energy
+!   RESULT_extend%HOMO = eval(norb)
+!   RESULT_extend%LUMO = merge(eval(norb+1),0._prec,nbas>norb)
+!   RESULT_extend%orb_energy(1:norb) = eval(1:norb)
+!   RESULT_extend%orb_vector(1:nbas,1:norb) = evec(1:nbas,1:norb)
+!   ij2 = 0
+!   do j2=1,norb
+!      do i2=1,j2
+!         ij2 = ij2 + 1
+!         do j1=1,norb
+!            do i1=1,norb
+!               RESULT_extend%pair_energy(i1,j1,ij2) = make_contract(&
+!                    nbas,RESULT_extend%orb_vector(:,i1),&
+!                    nbas,RESULT_extend%orb_vector(:,i2),&
+!                    nbas,RESULT_extend%orb_vector(:,j1),&
+!                    nbas,RESULT_extend%orb_vector(:,j2),&
+!                    twoel,dens)
+!            enddo
+!         enddo
+!      enddo
+!   enddo
+!endif
+!
+!call mem_dealloc(dens)
+!call mem_dealloc(matG)
+!call mem_dealloc(matF)
+!call mem_dealloc(evec)
+!call mem_dealloc(eval)
 
 call mem_dealloc(twoel)
 call mem_dealloc(matS)

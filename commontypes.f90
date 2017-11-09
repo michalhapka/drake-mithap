@@ -9,6 +9,7 @@ public possible_calc_type,possible_basis,possible_mult,possible_int3
 public print_EndSection
 public InputData,OrbInputData,PairInputData,init_Input,free_Input,print_Input
 public print_orb_control,print_pair_control,compare_prim_orbs,compare_prim_pairs
+public compare_prim_orbs_l
 public ControlData,fill_Control
 public SystemData,init_System,free_System,print_System,print_SystemExponents
 public OrbSystemData,OrbSpecData,OrbReducedData
@@ -133,10 +134,18 @@ integer :: n_prim
 type(OrbSpecData),allocatable :: OrbSpec(:)
 end type OrbSystemData
 
+type OrbSystemData_L
+type(OrbSystemData),allocatable :: OrbSystem(:)
+integer :: lorb
+end type OrbSystemData_L
+
 type OrbReducedData
 logical :: isUsed
 integer :: iexp
 integer :: maxrange
+integer :: nlang
+integer,allocatable :: lang(:)
+integer,allocatable :: max_lrange(:)
 end type OrbReducedData
 
 type PairSpecData
@@ -170,20 +179,25 @@ end type PairReducedData
 
 type SystemData
 real(prec) :: nucZ
-integer :: norb
-!integer,allocatable :: norb(:)
+!integer :: norb
+integer,allocatable :: norb(:)
 integer :: maxl 
 character(8) :: calc_type
 logical :: post_SCF,optimize
 logical :: common_orbs,common_pairs
-integer :: n_orbs,n_pairs
+!integer :: n_orbs,n_pairs
+integer,allocatable :: n_orbs(:)
+integer :: n_pairs
 integer :: Neta
 integer,allocatable :: eta(:)
 integer :: Nexp,NexpSQ
 real(prec),allocatable :: exponents(:)
-logical,allocatable :: isUsed_orbs(:),isUsed_pairs(:)
+!logical,allocatable :: isUsed_orbs(:),isUsed_pairs(:)
+logical,allocatable :: isUsed_pairs(:)
+logical,allocatable :: isUsed_orbs(:,:)
 logical,allocatable :: isOpt_orbs(:) ,isOpt_pairs(:)
-type(OrbSystemData),allocatable :: OrbSystem(:)
+type(OrbSystemData_L),allocatable :: OrbSystem_L(:)
+!type(OrbSystemData),allocatable :: OrbSystem(:)
 type(OrbReducedData),allocatable :: OrbReduced(:)
 type(PairSystemData),allocatable :: PairSystem(:,:)
 type(PairReducedData),allocatable :: PairReduced(:),OrbPairReduced(:)
@@ -576,6 +590,31 @@ diff_type = 0
 
 end function compare_prim_orbs
 
+function compare_prim_orbs_l(orb1,orb2) result(diff_type)
+implicit none
+integer :: diff_type
+integer,intent(in) :: orb1(:),orb2(:)
+integer :: key1,key2
+
+key1 = orb1(1)
+key2 = orb2(1)
+if(key1/=key2) then
+   diff_type = sign(1,key2-key1)
+   return
+endif
+
+key1 = orb1(3)
+key2 = orb2(3)
+if(key1/=key2) then
+   diff_type = sign(33,key2-key1)
+   return
+endif
+
+diff_type = 0
+
+end function compare_prim_orbs_l
+
+
 function compare_prim_pairs(pair1,pair2) result(diff_type)
 implicit none
 integer :: diff_type
@@ -704,42 +743,56 @@ integer :: i,j
 
 call mem_alloc(System%eta         ,System%Neta)
 call mem_alloc(System%exponents   ,System%Nexp)
-call mem_alloc(System%isUsed_orbs ,System%Nexp)
+!call mem_alloc(System%isUsed_orbs ,System%Nexp)
+call mem_alloc(System%isUsed_orbs ,System%Nexp, System%maxl+1)
 call mem_alloc(System%isUsed_pairs,System%Nexp)
 call mem_alloc(System%isOpt_orbs  ,System%Nexp)
 call mem_alloc(System%isOpt_pairs ,System%Nexp)
+!call mem_alloc(System%norb        ,System%maxl+1)
+!call mem_alloc(System%n_orbs      ,System%maxl+1)
+  
+  allocate(System%OrbSystem_L(System%maxl+1))
+  do i=1,size(System%OrbSystem_L)
+     allocate(System%OrbSystem_L(i)%OrbSystem(System%n_orbs(i)))
+   ! allocate(System%OrbSystem(System%n_orbs))
+  enddo
 
-allocate(System%OrbSystem(System%n_orbs))
-allocate(System%OrbReduced(System%Nexp))
+  allocate(System%OrbReduced(System%Nexp))
 
-do i=1,System%n_orbs
-   call init_OrbSystem(System%OrbSystem(i))
-enddo
-
-do i=1,System%Nexp
-   call init_OrbReduced(System%OrbReduced(i))
-enddo
-
-if(System%post_SCF) then
-
-   allocate(System%PairSystem(System%n_pairs,System%n_pairs))
-   allocate(System%PairReduced(System%NexpSQ))
-   allocate(System%OrbPairReduced(System%NexpSQ))
-
-   do j=1,System%n_pairs
-      do i=1,System%n_pairs
-         call init_PairSystem(System%PairSystem(i,j))
-      enddo
-   enddo
-
-   do i=1,System%NexpSQ
-      call init_PairReduced(System%PairReduced(i))
-   enddo
-   do i=1,System%NexpSQ
-      call init_PairReduced(System%OrbPairReduced(i))
-   enddo
-
-endif
+  do i=1,size(System%OrbSystem_L)
+     do j=1,System%n_orbs(i)
+        call init_OrbSystem(System%OrbSystem_L(i)%OrbSystem(j))
+     enddo
+  enddo
+ ! hapka: old_drake
+ ! do i=1,System%n_orbs
+ !    call init_OrbSystem(System%OrbSystem(i))
+ ! enddo
+ ! 
+  do i=1,System%Nexp
+     call init_OrbReduced(System%OrbReduced(i))
+  enddo
+ ! 
+ ! if(System%post_SCF) then
+ ! 
+ !    allocate(System%PairSystem(System%n_pairs,System%n_pairs))
+ !    allocate(System%PairReduced(System%NexpSQ))
+ !    allocate(System%OrbPairReduced(System%NexpSQ))
+ ! 
+ !    do j=1,System%n_pairs
+ !       do i=1,System%n_pairs
+ !          call init_PairSystem(System%PairSystem(i,j))
+ !       enddo
+ !    enddo
+ ! 
+ !    do i=1,System%NexpSQ
+ !       call init_PairReduced(System%PairReduced(i))
+ !    enddo
+ !    do i=1,System%NexpSQ
+ !       call init_PairReduced(System%OrbPairReduced(i))
+ !    enddo
+ ! 
+ ! endif
 
 end subroutine init_System
 
@@ -748,40 +801,51 @@ implicit none
 type(SystemData) :: System
 integer :: i,j
 
-if(System%post_SCF) then
+!if(System%post_SCF) then
+!
+!   do i=1,System%NexpSQ
+!      call free_PairReduced(System%OrbPairReduced(i))
+!   enddo
+!   do i=1,System%NexpSQ
+!      call free_PairReduced(System%PairReduced(i))
+!   enddo
+!
+!   do j=1,System%n_pairs
+!      do i=1,System%n_pairs
+!         call free_PairSystem(System%PairSystem(i,j))
+!      enddo
+!   enddo
+!
+!   deallocate(System%OrbPairReduced)
+!   deallocate(System%PairReduced)
+!   deallocate(System%PairSystem)
+!
+!endif
+!
+! OrbSpece!
+!do j=1,System%maxl+1
+!   do i=1,System%n_orbs(j)
+!      call free_OrbSystem(System%OrbSystem_L(j)%OrbSystem(i))
+!   enddo
+!enddo
 
-   do i=1,System%NexpSQ
-      call free_PairReduced(System%OrbPairReduced(i))
-   enddo
-   do i=1,System%NexpSQ
-      call free_PairReduced(System%PairReduced(i))
-   enddo
+!do i=1,System%n_orbs
+!   call free_OrbSystem(System%OrbSystem(i))
+!enddo
 
-   do j=1,System%n_pairs
-      do i=1,System%n_pairs
-         call free_PairSystem(System%PairSystem(i,j))
-      enddo
-   enddo
-
-   deallocate(System%OrbPairReduced)
-   deallocate(System%PairReduced)
-   deallocate(System%PairSystem)
-
-endif
-
-do i=1,System%n_orbs
-   call free_OrbSystem(System%OrbSystem(i))
-enddo
 
 deallocate(System%OrbReduced)
-deallocate(System%OrbSystem)
+deallocate(System%OrbSystem_L)
+!deallocate(System%OrbSystem)
 
-call mem_dealloc(System%isOpt_pairs)
-call mem_dealloc(System%isOpt_orbs)
-call mem_dealloc(System%isUsed_pairs)
+ call mem_dealloc(System%isOpt_pairs)
+ call mem_dealloc(System%isOpt_orbs)
+ call mem_dealloc(System%isUsed_pairs)
 call mem_dealloc(System%isUsed_orbs)
 call mem_dealloc(System%exponents)
 call mem_dealloc(System%eta)
+call mem_dealloc(System%norb)
+call mem_dealloc(System%n_orbs)
 
 end subroutine free_System
 
@@ -1460,19 +1524,23 @@ endif
 end function maxuv_PairReduced_t
 
 subroutine print_System(System,LPRINT)
+use angmom
 use misc, only : swap
 implicit none
 type(SystemData) :: System
 integer :: LPRINT
 integer :: i,j,idx1,idx2
+character(10),allocatable,dimension(:) :: tostr
+character(180) :: fout1,fout2
+character(8) :: one,two
 
 write(LOUT,'()')
 write(LOUT,'(5x,a)') '--- Calculation specifications ---'
 
 write(LOUT,'()')
-write(LOUT,'(a,f7.3)') 'Nuclear charge:     ',System%nucZ
+write(LOUT,'(a,f7.3)') 'Nuclear charge:   ',System%nucZ
 write(LOUT,'(a,i3)') 'Max. ang. momentum: ',System%maxl
-write(LOUT,'(a,i3)') 'Number of orbitals: ',System%norb
+write(LOUT,'(a,*(i3))') 'Number of orbitals: ',System%norb
 write(LOUT,'(a,3x,a,t35,a)',advance='no') &
      'Calculation type:   ',trim(System%calc_type),'('
 if(System%post_SCF) then
@@ -1508,30 +1576,86 @@ if(System%common_orbs) then
 else
    write(LOUT,'(a)') 'SEPARATE'
 endif
-do i=1,System%n_orbs
-   associate(OrbSystem => System%OrbSystem(i))
-     write(LOUT,'()')
-     if(.not.System%common_orbs) write(LOUT,'(a,i3)') 'orbital no. ',i
-     call print_OrbSystem(OrbSystem,LPRINT)
-   end associate
-enddo
+
+ do j=1,System%maxl+1 
+    do i=1,System%n_orbs(j)
+       associate(OrbSystem => System%OrbSystem_L(j)%OrbSystem(i))
+         write(LOUT,'()')
+         if(.not.System%common_orbs) write(LOUT,'(a,i3)') 'orbital no. ',i
+         call print_OrbSystem(OrbSystem,LPRINT,System%OrbSystem_L(j)%lorb)
+       end associate
+    enddo
+ enddo
+
+
+! hapka: old_drake
+! do i=1,System%n_orbs
+!    associate(OrbSystem => System%OrbSystem(i))
+!      write(LOUT,'()')
+!      if(.not.System%common_orbs) write(LOUT,'(a,i3)') 'orbital no. ',i
+!      call print_OrbSystem(OrbSystem,LPRINT)
+!    end associate
+! enddo
 
 if(LPRINT>=5) then
+
+allocate(tostr(System%maxl+2))
+
+fout1="(11x,a,2x,a"
+one=",2x,a"
+do i=1,System%maxl+1
+   tostr(i)="maxrange-"//get_angmom_name(i-1)
+   fout1=trim(fout1)//trim(one)   
+enddo
+   tostr(System%maxl+2) ="maxrange"
+   fout1=trim(fout1)//trim(one)   
+   fout1=trim(fout1)//')'
 
    write(LOUT,'()')
    write(LOUT,'(a)') 'reduced obital information'
    write(LOUT,'()')
-   write(LOUT,'(11x,a,2x,a,1x,a)') 'no.','exp','maxrange'
+   write(LOUT,fout1) 'no.','exp',tostr
    do i=1,System%Nexp
       associate(OrbReduced => System%OrbReduced(i))
         write(LOUT,'(10x,i3,a)',advance='no') i,' : '
         if(OrbReduced%isUsed) then
-           write(LOUT,'(i3,2x,i3)') OrbReduced%iexp,OrbReduced%maxrange
+            write(LOUT,'(i3,4x)',advance='no') OrbReduced%iexp
+            idx1=1
+            do j=1,System%maxl+1
+               if((j-1).eq.OrbReduced%lang(idx1)) then
+                   write(LOUT,'(i3,9x)',advance='no') OrbReduced%max_lrange(idx1)
+                   idx1 = idx1 + 1
+               else
+                   write(LOUT,'(a,4x)',advance='no') 'NOT USED'
+               endif
+           enddo
+           write(LOUT,'(i3,9x)') OrbReduced%maxrange
+!           write(LOUT,'()')
         else
            write(LOUT,'(a)') 'NOT USED'
         endif
       end associate
    enddo
+
+
+
+! hapka: old_drake
+!   write(LOUT,'()')
+!   write(LOUT,'(a)') 'reduced obital information'
+!   write(LOUT,'()')
+!   write(LOUT,'(11x,a,2x,a,1x,a)') 'no.','exp','maxrange'
+!   do i=1,System%Nexp
+!      associate(OrbReduced => System%OrbReduced(i))
+!        write(LOUT,'(10x,i3,a)',advance='no') i,' : '
+!        if(OrbReduced%isUsed) then
+!           write(LOUT,'(i3,2x,i3)') OrbReduced%iexp,OrbReduced%maxrange
+!        else
+!           write(LOUT,'(a)') 'NOT USED'
+!        endif
+!      end associate
+!   enddo
+
+deallocate(tostr)
 
 endif
 
@@ -1588,30 +1712,81 @@ endif
 end subroutine print_System
 
 subroutine print_SystemExponents(System)
+
+use angmom
 implicit none
 type(SystemData) :: System
 integer :: i
+character(180) :: fout1, fout2
+character(6),allocatable,dimension(:) :: tostr
+character(8) :: one, two
+
+! hapka: ADD PAIRS LATER!
+! prepare formats
+
+allocate(tostr(System%maxl+1))
+
+do i=1,System%maxl+1
+   tostr(i)="orbs-"//get_angmom_name(i-1)
+enddo
+
+! headline
+fout1='(1x,a,7x,a,10x'
+fout2='(i3,a,f16.8'
+one=",a,5x"
+two=",l8,3x"
+do i=1,System%maxl+1
+   fout1=trim(fout1)//trim(one)
+   fout2=trim(fout2)//trim(two)
+enddo
+fout1=trim(fout1)//',a)'
+fout2=trim(fout2)//',a)'
 
 write(LOUT,'()')
 write(LOUT,'(a)') 'Exponents'
-write(LOUT,'(1x,a,7x,a,10x,a,7x,a)') &
-     'no.','value','orbs','pairs'
+write(LOUT,trim(fout1)) & 
+      'no.', 'value', tostr
+! content
 do i=1,System%Nexp
-   write(LOUT,'(i3,a,f16.8,2(l8,1x,a))') i,' :',&
-        System%exponents(i),&
-        System%isUsed_orbs(i) ,merge('OPT','   ',System%isOpt_orbs(i)),&
-        System%isUsed_pairs(i),merge('OPT','   ',System%isOpt_pairs(i))
+   write(LOUT,trim(fout2)) i,' :',&
+   System%exponents(i),&
+   System%isUsed_orbs(i,:)  
 enddo
+
+! hapka: old_drake
+!write(LOUT,'()')
+!write(LOUT,'(a)') 'Exponents'
+!write(LOUT,'(1x,a,7x,a,10x,a,7x,a)') &
+!     'no.','value','orbs','pairs'
+!
+!do i=1,System%Nexp
+!   write(LOUT,'(i3,a,f16.8,2(l8,1x,a))') i,' :',&
+!        System%exponents(i),&
+!        System%isUsed_orbs(i) ,merge('OPT','   ',System%isOpt_orbs(i)),&
+!        System%isUsed_pairs(i),merge('OPT','   ',System%isOpt_pairs(i))
+!enddo
+
+
+
+!do i=1,System%Nexp
+! write(LOUT,'(i3,a,f16.8,l8,l8)') i, ' :', &
+! System%exponents(i),&
+! System%isUsed_orbs(i,:)
+!enddo
+
+deallocate(tostr)
 
 end subroutine print_SystemExponents
 
-subroutine print_OrbSystem(OrbSystem,LPRINT)
+subroutine print_OrbSystem(OrbSystem,LPRINT,lorb)
+use angmom
 implicit none
 type(OrbSystemData) :: OrbSystem
-integer :: LPRINT
+integer :: LPRINT, lorb
 integer :: i
 
-write(LOUT,'(a,i5)') 'Number of basis functions: ',OrbSystem%nbas
+write(LOUT, '(a,1x,a)') 'Orbital type:                 ', get_angmom_name(lorb)
+write(LOUT,'(a,i5)')  'Number of basis functions: ',OrbSystem%nbas
 write(LOUT,'(a,i5)') 'Number of primitives:      ',OrbSystem%n_prim
 
 if(LPRINT>=2) then
@@ -2044,25 +2219,25 @@ type(SCForbitalsData) :: SCForbitals
 type(SystemData) :: System
 integer :: i
 
-SCForbitals%norb = System%norb
-SCForbitals%nbas = 0
-do i=1,System%n_orbs
-   associate(OrbSystem => System%OrbSystem(i))
-     SCForbitals%nbas = max(SCForbitals%nbas,OrbSystem%nbas)
-   end associate
-enddo
-
-call mem_alloc(SCForbitals%orb_energy,SCForbitals%norb)
-call mem_alloc(SCForbitals%orb_vector,SCForbitals%nbas,SCForbitals%norb)
-call mem_alloc(SCForbitals%pair_energy,&
-     SCForbitals%norb,SCForbitals%norb,&
-     SCForbitals%norb*(SCForbitals%norb + 1)/2)
-
-SCForbitals%energy = 0._prec
-
-SCForbitals%orb_energy  = 0._prec
-SCForbitals%orb_vector  = 0._prec
-SCForbitals%pair_energy = 0._prec
+! SCForbitals%norb = System%norb
+! SCForbitals%nbas = 0
+! do i=1,System%n_orbs
+!    associate(OrbSystem => System%OrbSystem(i))
+!      SCForbitals%nbas = max(SCForbitals%nbas,OrbSystem%nbas)
+!    end associate
+! enddo
+! 
+! call mem_alloc(SCForbitals%orb_energy,SCForbitals%norb)
+! call mem_alloc(SCForbitals%orb_vector,SCForbitals%nbas,SCForbitals%norb)
+! call mem_alloc(SCForbitals%pair_energy,&
+!      SCForbitals%norb,SCForbitals%norb,&
+!      SCForbitals%norb*(SCForbitals%norb + 1)/2)
+! 
+! SCForbitals%energy = 0._prec
+! 
+! SCForbitals%orb_energy  = 0._prec
+! SCForbitals%orb_vector  = 0._prec
+! SCForbitals%pair_energy = 0._prec
 
 end subroutine init_SCForbitals
 
@@ -2086,90 +2261,90 @@ integer :: i,j
 real(prec) :: energy
 integer,allocatable :: nbas(:)
 
-write(LOUT,'()')
-write(LOUT,'(5x,a)') '--- SCF orbitals and energies ---'
-
-write(LOUT,'()')
-write(LOUT,'(a,i5)') 'Number of orbitals: ',SCForbitals%norb
-if(System%common_orbs) then
-   write(LOUT,'(a,i5)') 'Basis set size:     ',SCForbitals%nbas
-else
-   write(LOUT,'(a,i5)') 'Max basis set size: ',SCForbitals%nbas
-endif
-
-write(LOUT,'()')
-write(LOUT,'(13x,a,i2,9(:15x,a,i2))') ('orb no. ',iorb,iorb=1,SCForbitals%norb)
-
-write(LOUT,'()')
-write(LOUT,'(a)') 'AO coefficients'
-if(System%common_orbs) then
-   do ibas=1,SCForbitals%nbas
-      write(LOUT,'(i5,10es25.14)') ibas,&
-           (SCForbitals%orb_vector(ibas,iorb),iorb=1,SCForbitals%norb)
-   enddo
-else
-   call mem_alloc(nbas,SCForbitals%norb)
-   do iorb=1,SCForbitals%norb
-      nbas(iorb) = System%OrbSystem(iorb)%nbas
-   enddo
-   do ibas=1,SCForbitals%nbas
-      write(LOUT,'(i5)',advance='no') ibas
-      do iorb=1,SCForbitals%norb
-         if(ibas<=nbas(iorb)) then
-            write(LOUT,'(es25.14)',advance='no') &
-                 SCForbitals%orb_vector(ibas,iorb)
-         else
-            write(LOUT,'(a25)',advance='no') ''
-         endif
-      enddo
-      write(LOUT,'()')
-   enddo
-   call mem_dealloc(nbas)
-endif
-
-write(LOUT,'()')
-write(LOUT,'(a)') 'orbital energies'
-write(LOUT,'(5x,10f25.18)') &
-     (SCForbitals%orb_energy(iorb),iorb=1,SCForbitals%norb)
-
-write(LOUT,'()') 
-write(LOUT,'(a,f25.18)') 'LUMO: ',SCForbitals%LUMO
-write(LOUT,'(a,f25.18)') 'HOMO: ',SCForbitals%HOMO
-
-write(LOUT,'()')
-write(LOUT,'(a)') 'pair energies'
-ij2 = 0
-do j2=1,SCForbitals%norb
-   do i2=1,j2
-      ij2 = ij2 + 1
-      do j1=1,SCForbitals%norb
-         do i1=1,SCForbitals%norb
-            write(LOUT,'(5x,a,2i2,a,2i2,a,f25.18)') &
-                 '<',i1,j1,' |',i2,j2,' >',SCForbitals%pair_energy(i1,j1,ij2)
-         enddo
-      enddo
-      write(LOUT,'()')
-   enddo
-enddo
-
-energy = 0._prec
-do i=1,SCForbitals%norb
-   energy = energy &
-        + 2._prec*(SCForbitals%orb_energy(i) &
-        - 0.5_prec*SCForbitals%pair_energy(i,i,i*(i+1)/2))
-enddo
-do j=1,SCForbitals%norb
-   do i=1,j-1
-      energy = energy - 2._prec*( &
-           2*SCForbitals%pair_energy(i,j,i+j*(j-1)/2) &
-           - SCForbitals%pair_energy(j,i,i+j*(j-1)/2))
-   enddo
-enddo
-
-write(LOUT,'(a)') 'SCF energy'
-write(LOUT,'(a,f25.18)') 'from orbital and pair energies: ',energy
-write(LOUT,'(a,f25.18)') 'from the SCF procedure:         ',SCForbitals%energy
-
+! write(LOUT,'()')
+! write(LOUT,'(5x,a)') '--- SCF orbitals and energies ---'
+! 
+! write(LOUT,'()')
+! write(LOUT,'(a,i5)') 'Number of orbitals: ',SCForbitals%norb
+! if(System%common_orbs) then
+!    write(LOUT,'(a,i5)') 'Basis set size:     ',SCForbitals%nbas
+! else
+!    write(LOUT,'(a,i5)') 'Max basis set size: ',SCForbitals%nbas
+! endif
+! 
+! write(LOUT,'()')
+! write(LOUT,'(13x,a,i2,9(:15x,a,i2))') ('orb no. ',iorb,iorb=1,SCForbitals%norb)
+! 
+! write(LOUT,'()')
+! write(LOUT,'(a)') 'AO coefficients'
+! if(System%common_orbs) then
+!    do ibas=1,SCForbitals%nbas
+!       write(LOUT,'(i5,10es25.14)') ibas,&
+!            (SCForbitals%orb_vector(ibas,iorb),iorb=1,SCForbitals%norb)
+!    enddo
+! else
+!    call mem_alloc(nbas,SCForbitals%norb)
+!    do iorb=1,SCForbitals%norb
+!       nbas(iorb) = System%OrbSystem(iorb)%nbas
+!    enddo
+!    do ibas=1,SCForbitals%nbas
+!       write(LOUT,'(i5)',advance='no') ibas
+!       do iorb=1,SCForbitals%norb
+!          if(ibas<=nbas(iorb)) then
+!             write(LOUT,'(es25.14)',advance='no') &
+!                  SCForbitals%orb_vector(ibas,iorb)
+!          else
+!             write(LOUT,'(a25)',advance='no') ''
+!          endif
+!       enddo
+!       write(LOUT,'()')
+!    enddo
+!    call mem_dealloc(nbas)
+! endif
+! 
+! write(LOUT,'()')
+! write(LOUT,'(a)') 'orbital energies'
+! write(LOUT,'(5x,10f25.18)') &
+!      (SCForbitals%orb_energy(iorb),iorb=1,SCForbitals%norb)
+! 
+! write(LOUT,'()') 
+! write(LOUT,'(a,f25.18)') 'LUMO: ',SCForbitals%LUMO
+! write(LOUT,'(a,f25.18)') 'HOMO: ',SCForbitals%HOMO
+! 
+! write(LOUT,'()')
+! write(LOUT,'(a)') 'pair energies'
+! ij2 = 0
+! do j2=1,SCForbitals%norb
+!    do i2=1,j2
+!       ij2 = ij2 + 1
+!       do j1=1,SCForbitals%norb
+!          do i1=1,SCForbitals%norb
+!             write(LOUT,'(5x,a,2i2,a,2i2,a,f25.18)') &
+!                  '<',i1,j1,' |',i2,j2,' >',SCForbitals%pair_energy(i1,j1,ij2)
+!          enddo
+!       enddo
+!       write(LOUT,'()')
+!    enddo
+! enddo
+! 
+! energy = 0._prec
+! do i=1,SCForbitals%norb
+!    energy = energy &
+!         + 2._prec*(SCForbitals%orb_energy(i) &
+!         - 0.5_prec*SCForbitals%pair_energy(i,i,i*(i+1)/2))
+! enddo
+! do j=1,SCForbitals%norb
+!    do i=1,j-1
+!       energy = energy - 2._prec*( &
+!            2*SCForbitals%pair_energy(i,j,i+j*(j-1)/2) &
+!            - SCForbitals%pair_energy(j,i,i+j*(j-1)/2))
+!    enddo
+! enddo
+! 
+! write(LOUT,'(a)') 'SCF energy'
+! write(LOUT,'(a,f25.18)') 'from orbital and pair energies: ',energy
+! write(LOUT,'(a,f25.18)') 'from the SCF procedure:         ',SCForbitals%energy
+! 
 end subroutine print_SCForbitals
 
 end module commontypes

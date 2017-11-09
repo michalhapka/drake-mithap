@@ -18,13 +18,11 @@ call timer('START',Tcpu,Twall)
 
 call read_Input(Input)
 call fill_Control(Control,Input)
-!call create_System(System,Input,Control)
+call create_System(System,Input,Control)
 call free_Input(Input)
+call calculate(System,Control)
 
-!call calculate(System,Control)
-
-!call free_System(System)
-
+call free_System(System)
 call mem_report
 call timer('Total program',Tcpu,Twall)
 call close_OUT

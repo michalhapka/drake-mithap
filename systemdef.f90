@@ -17,25 +17,58 @@ type(InputData),intent(in) :: Input
 type(ControlData),intent(in) :: Control
 logical :: post_SCF,optimize
 logical :: common_orbs,common_pairs
-integer :: n_orbs,n_pairs
+!integer :: n_orbs,n_pairs
+integer,allocatable :: n_orbs(:)
+integer :: n_pairs
 integer :: maxprim_orbs,maxprim_pairs
 integer :: sumprim_orbs,sumprim_pairs
 integer :: nprim_orbs,nprim_pairs
 integer :: Neta
 integer :: Nexp_orig,Nexp
-logical,allocatable :: isUsed_orbs(:),isUsed_pairs(:),isUsed(:)
-logical,allocatable :: isOpt_orbs(:),isOpt_pairs(:)
+logical,allocatable :: isUsed_orbs(:,:)
+logical,allocatable :: isUsed_pairs(:),isUsed(:)
+!logical,allocatable :: isUsed_orbs(:),isUsed_pairs(:),isUsed(:)
+logical,allocatable :: isOpt_orbs(:,:)
+logical,allocatable :: isOpt_pairs(:)
+!logical,allocatable :: isOpt_orbs(:),isOpt_pairs(:)
 integer,allocatable :: exp_reorder(:)
 integer,allocatable :: prim(:,:),prim_all(:,:)
 integer,allocatable :: diff(:),diff_all(:)
+integer,allocatable :: diff_l(:)
 logical,allocatable :: expSQ_restrict(:)
 character(2) :: sepspace
 logical :: written
 integer :: i,j,k
 
-! post_SCF = (index(Input%calc_type,'SCF')==0)
-! optimize = (index(Input%calc_type,'OPT')/=0)
-! 
+ post_SCF = (index(Input%calc_type,'SCF')==0)
+ optimize = (index(Input%calc_type,'OPT')/=0)
+
+ call mem_alloc(n_orbs,Input%maxl+1)
+
+ 
+ select case(trim(Input%orbs_basis))
+ case('COMMON')
+    common_orbs = .true.
+    n_orbs = 1
+ case('SEPARATE')
+    common_orbs = .false.
+
+    do i=1,Input%maxl+1
+       n_orbs(i) = Input%norb(i)
+       if(n_orbs(i)/=2) then
+          write(LOUT,'(a)') &
+               'ERROR!!! Separate SCF orbitals possible only for norb = 2 !'
+          stop
+       endif
+    enddo
+
+ case default
+    write(LOUT,'(a)') 'Unrecognizable type of orbital basis set: &
+         &creating system data!'
+    stop
+ end select
+
+! hapka: old_drake
 ! select case(trim(Input%orbs_basis))
 ! case('COMMON')
 !    common_orbs = .true.
@@ -53,7 +86,8 @@ integer :: i,j,k
 !         &creating system data!'
 !    stop
 ! end select
-! 
+!
+! hapka: post_SCF (to be done later) 
 ! if(post_SCF) then
 !    select case(trim(Input%pairs_basis))
 !    case('COMMON')
@@ -72,31 +106,64 @@ integer :: i,j,k
 !    n_pairs = 0
 ! endif
 ! 
-! if(post_SCF) then
-!    if(optimize) then
-!       if(Input%Neta>1) then
-!          write(LOUT,'(a)') 'WARNING!!! &
-!               &In post SCF optimizations &
-!               &only the smallest eta value will be used!'
-!       endif
-!       Neta = 1
-!    else
-!       Neta = Input%Neta
-!    endif
-! else
-!    Neta = 0
-! endif
-! 
-! Nexp_orig = Input%Nexponents
-! 
-! call mem_alloc(exp_reorder,Nexp_orig)
-! 
+ if(post_SCF) then
+    if(optimize) then
+       if(Input%Neta>1) then
+          write(LOUT,'(a)') 'WARNING!!! &
+               &In post SCF optimizations &
+               &only the smallest eta value will be used!'
+       endif
+       Neta = 1
+    else
+       Neta = Input%Neta
+    endif
+ else
+    Neta = 0
+ endif
+ 
+ Nexp_orig = Input%Nexponents
+ 
+ call mem_alloc(exp_reorder,Nexp_orig)
+
+ call mem_alloc(isUsed_orbs ,Nexp_orig, Input%maxl+1)
+! call mem_alloc(isUsed_pairs,Nexp_orig)
+ call mem_alloc(isUsed      ,Nexp_orig)
+! call mem_alloc(isOpt_orbs  ,Nexp_orig)
+! call mem_alloc(isOpt_pairs ,Nexp_orig)
+
+! hapka: old_drake 
 ! call mem_alloc(isUsed_orbs ,Nexp_orig)
 ! call mem_alloc(isUsed_pairs,Nexp_orig)
 ! call mem_alloc(isUsed      ,Nexp_orig)
 ! call mem_alloc(isOpt_orbs  ,Nexp_orig)
 ! call mem_alloc(isOpt_pairs ,Nexp_orig)
-! 
+ 
+ maxprim_orbs = 0
+ sumprim_orbs = 0
+ isUsed_orbs  = .false.
+
+ do k=1,size(Input%OrbInput_L)
+    do j=1,n_orbs(k)
+       associate(OrbInput => Input%OrbInput_L(k)%OrbInput(j))
+    
+         nprim_orbs = OrbInput%Nprimitives
+         if(nprim_orbs<1) then
+            write(LOUT,'(a)') 'Every orbital should be specified!'
+            stop
+         endif
+    
+         maxprim_orbs = max(maxprim_orbs,nprim_orbs)
+         sumprim_orbs = sumprim_orbs + nprim_orbs
+    
+         do i=1,nprim_orbs
+            isUsed_orbs(OrbInput%orb_control(1,i),k) = .true.
+         enddo
+    
+       end associate
+    enddo
+ enddo
+
+! hapka: old_drake
 ! maxprim_orbs = 0
 ! sumprim_orbs = 0
 ! isUsed_orbs  = .false.
@@ -150,6 +217,7 @@ integer :: i,j,k
 ! 
 ! isOpt_orbs  = .false.
 ! isOpt_pairs = .false.
+
 ! if(optimize) then
 !    if(post_SCF) then
 ! 
@@ -188,98 +256,171 @@ integer :: i,j,k
 !    endif
 ! endif
 ! 
+
+ if(post_SCF) then
+     write(LOUT,'(a)') 'Post SCF not ready!'
+!    isUsed(:) = (isUsed_pairs.and..not.isOpt_pairs)
+!    isUsed(:) = (isUsed_orbs.or.isUsed)
+ else
+! hapka: SCFOpt to do later!
+!    isUsed(:) = (isUsed_orbs.and..not.isOpt_orbs)
+    do i=1,Nexp_orig
+       isUsed(i) = any(isUsed_orbs(i,:))
+       !isUsed(:) = (isUsed_orbs(:,1).or.isUsed_orbs(:,2))
+    enddo
+ endif
+
+! hapka: old_drake
 ! if(post_SCF) then
 !    isUsed(:) = (isUsed_pairs.and..not.isOpt_pairs)
 !    isUsed(:) = (isUsed_orbs.or.isUsed)
 ! else
 !    isUsed(:) = (isUsed_orbs.and..not.isOpt_orbs)
 ! endif
-! written = .false.
-! do j=2,Nexp_orig
-!    do i=1,j-1
-!       if(isUsed(i).and.isUsed(j)) then
-!          if(abs(Input%exponents(i) - Input%exponents(j))<Control%SIMTHR) then
-!             if(.not.written) then
-!                write(LOUT,'(a,es10.3,a)') 'ERROR!!! &
-!                     &Nonopt exponents are too close to each other &
-!                     &(SIMTHR = ',Control%SIMTHR,')'
-!                written = .true.
-!             endif
-!             write(LOUT,'(2i3,5x,2f16.8)') &
-!                  i,j,Input%exponents(i),Input%exponents(j)
-!          endif
-!       endif
-!    enddo
-! enddo
-! if(written) stop
-! 
+ written = .false.
+ do j=2,Nexp_orig
+    do i=1,j-1
+       if(isUsed(i).and.isUsed(j)) then
+          if(abs(Input%exponents(i) - Input%exponents(j))<Control%SIMTHR) then
+             if(.not.written) then
+                write(LOUT,'(a,es10.3,a)') 'ERROR!!! &
+                     &Nonopt exponents are too close to each other &
+                     &(SIMTHR = ',Control%SIMTHR,')'
+                written = .true.
+             endif
+             write(LOUT,'(2i3,5x,2f16.8)') &
+                  i,j,Input%exponents(i),Input%exponents(j)
+          endif
+       endif
+    enddo
+ enddo
+ if(written) stop
+
+! hapka - post SCF to be done later
 ! isUsed(:) = (isUsed_orbs.or.isUsed_pairs)
-! Nexp = count(isUsed)
-! 
-! if(Nexp/=Nexp_orig) then
-!    write(LOUT,'()')
-!    write(LOUT,'(a)',advance='no') &
-!         'Input exponents that are not used will be ignored'
-!    sepspace = ': '
-!    do i=1,Nexp_orig
-!       if(.not.isUsed(i)) then
-!          write(LOUT,'(a,i3)',advance='no') sepspace,i
-!          sepspace = ', '
-!       endif
-!    enddo
-!    write(LOUT,'()')
-! endif
-! 
-! System%nucZ         = Input%nucZ
-! System%maxl         = Input%maxl
+ Nexp = count(isUsed)
+ 
+ if(Nexp/=Nexp_orig) then
+    write(LOUT,'()')
+    write(LOUT,'(a)',advance='no') &
+         'Input exponents that are not used will be ignored'
+    sepspace = ': '
+    do i=1,Nexp_orig
+       if(.not.isUsed(i)) then
+          write(LOUT,'(a,i3)',advance='no') sepspace,i
+          sepspace = ', '
+       endif
+    enddo
+    write(LOUT,'()')
+ endif
+ 
+ System%nucZ         = Input%nucZ
+ System%maxl         = Input%maxl
 ! System%norb         = Input%norb
-! System%calc_type    = Input%calc_type
-! System%post_SCF     = post_SCF
-! System%optimize     = optimize
-! System%common_orbs  = common_orbs
-! System%common_pairs = common_pairs
 ! System%n_orbs       = n_orbs
+ System%calc_type    = Input%calc_type
+ System%post_SCF     = post_SCF
+ System%optimize     = optimize
+ System%common_orbs  = common_orbs
+! System%common_pairs = common_pairs
 ! System%n_pairs      = n_pairs
-! System%Neta         = Neta
-! System%Nexp         = Nexp
-! System%NexpSQ       = System%Nexp*(System%Nexp + 1)/2
-! 
-! call init_System(System)
-! 
-! System%eta(:) = Input%eta(Input%Neta-System%Neta+1:Input%Neta)
-! 
-! i=0
-! do j=1,Nexp_orig
-!    if(isUsed(j)) then
-!       i = i + 1
-! 
-!       System%exponents(i)    = Input%exponents(j)
+ System%Neta         = Neta
+ System%Nexp         = Nexp
+ System%NexpSQ       = System%Nexp*(System%Nexp + 1)/2
+
+ call mem_alloc(System%norb        ,System%maxl+1)
+ call mem_alloc(System%n_orbs      ,System%maxl+1)
+ System%norb = Input%norb
+ System%n_orbs = n_orbs
+ 
+ call init_System(System)
+ 
+ System%eta(:) = Input%eta(Input%Neta-System%Neta+1:Input%Neta)
+ 
+ i=0
+ do j=1,Nexp_orig
+    if(isUsed(j)) then
+       i = i + 1
+ 
+       System%exponents(i)    = Input%exponents(j)
 !       System%isUsed_orbs(i)  = isUsed_orbs(j)
 !       System%isUsed_pairs(i) = isUsed_pairs(j)
 !       System%isOpt_orbs(i)   = isOpt_orbs(j)
 !       System%isOpt_pairs(i)  = isOpt_pairs(i)
 ! 
-!       exp_reorder(j) = i
-!    else
-!       exp_reorder(j) = -1
-!    endif
-! enddo
-! if(i/=System%Nexp) then
-!    write(LOUT,'(a)') 'ERROR!!! Wrong number of exponents in create_System!'
-!    stop
-! endif
-! 
+       exp_reorder(j) = i
+    else
+       exp_reorder(j) = -1
+    endif
+ enddo
+
+ if(i/=System%Nexp) then
+    write(LOUT,'(a)') 'ERROR!!! Wrong number of exponents in create_System!'
+    stop
+ endif
+
+ do k=1,System%maxl+1
+ i=0
+    do j=1,Nexp_orig
+       if(isUsed(j)) then
+          i = i + 1
+          System%isUsed_orbs(i,k)  = isUsed_orbs(j,k)
+       endif
+    enddo
+ enddo
+
+ 
 ! call mem_dealloc(isOpt_pairs)
 ! call mem_dealloc(isOpt_orbs)
-! call mem_dealloc(isUsed)
+ call mem_dealloc(isUsed)
 ! call mem_dealloc(isUsed_pairs)
-! call mem_dealloc(isUsed_orbs)
-! 
-! call mem_alloc(prim,2,maxprim_orbs)
-! call mem_alloc(prim_all,2,sumprim_orbs)
-! call mem_alloc(diff,maxprim_orbs)
-! call mem_alloc(diff_all,sumprim_orbs)
-! 
+ call mem_dealloc(isUsed_orbs)
+
+ call mem_alloc(prim,2,maxprim_orbs)
+ call mem_alloc(prim_all,3,sumprim_orbs)
+ call mem_alloc(diff,maxprim_orbs)
+ call mem_alloc(diff_all,sumprim_orbs)
+ call mem_alloc(diff_l,sumprim_orbs)
+
+ sumprim_orbs = 0
+ do i=1,System%maxl+1
+   System%OrbSystem_L(i)%lorb = Input%OrbInput_L(i)%lorb 
+    do j=1,System%n_orbs(i)
+       associate(OrbInput => Input%OrbInput_L(i)%OrbInput(j), &
+            OrbSystem => System%OrbSystem_L(i)%OrbSystem(j))
+    
+         nprim_orbs = OrbInput%Nprimitives
+         prim(:,1:nprim_orbs) = OrbInput%orb_control
+         do k=1,nprim_orbs
+            prim(1,k) = exp_reorder(prim(1,k))
+         enddo
+    
+         call sort_prim(nprim_orbs,prim,diff,compare_prim_orbs)
+         if(any(diff(1:nprim_orbs)>1)) then
+            write(LOUT,'(a)') &
+                 'ERROR!!! Some of the orbital primitives are redefined!'
+            call print_orb_control(nprim_orbs,prim)
+            stop
+         endif
+         if(any(diff(1:nprim_orbs)==0)) then
+            write(LOUT,'(a)') &
+                 'ERROR!!! Some of the orbital primitives appear more than once!'
+            call print_orb_control(nprim_orbs,prim)
+            stop
+         endif
+    
+         call create_OrbSystem(OrbSystem,nprim_orbs,prim)
+    
+         prim_all(1:2,sumprim_orbs+1:sumprim_orbs+nprim_orbs) = &
+              prim(:,1:nprim_orbs)
+         prim_all(3,sumprim_orbs+1:sumprim_orbs+nprim_orbs) = & 
+              System%OrbSystem_L(i)%lorb 
+         sumprim_orbs = sumprim_orbs + nprim_orbs
+       end associate
+    enddo
+ enddo
+ 
+! hapka: old_drake
 ! sumprim_orbs = 0
 ! do j=1,System%n_orbs
 !    associate(OrbInput => Input%OrbInput(j), &
@@ -314,15 +455,33 @@ integer :: i,j,k
 !    end associate
 ! enddo
 ! 
-! call sort_prim(sumprim_orbs,prim_all,diff_all,compare_prim_orbs)
-! call reduce_prim(sumprim_orbs,prim_all,diff_all)
+ call sort_prim(sumprim_orbs,prim_all,diff_all,compare_prim_orbs)
+ !call reduce_prim(sumprim_orbs,prim_all,diff_all)
+ call reduce_prim_l(sumprim_orbs,prim_all,diff_all)
+! prim_all(1,3)=1
+! prim_all(3,3)=2
+ call sort_prim(sumprim_orbs,prim_all,diff_l,compare_prim_orbs_l)
+! write(*,*) 'prim_all(1,:) ', prim_all(1,1:sumprim_orbs)
+! write(*,*) 'prim_all(2,:) ', prim_all(2,1:sumprim_orbs)
+! write(*,*) 'prim_all(3,:) ', prim_all(3,1:sumprim_orbs)
+
+ if(any(diff_l==0)) then
+   write(LOUT,'(a)') 'ERROR!  Primitives have not been reduce properly in reduce_orbs_l!'
+    stop
+ endif
+ 
+ call create_OrbReduced_l(System%OrbReduced,sumprim_orbs,prim_all,&
+      System%Nexp,System%maxl,System%isUsed_orbs)
+
+! hapka: old_drake
 ! call create_OrbReduced(System%OrbReduced,sumprim_orbs,prim_all,&
 !      System%Nexp,System%isUsed_orbs)
 ! 
-! call mem_dealloc(diff_all)
-! call mem_dealloc(diff)
-! call mem_dealloc(prim_all)
-! call mem_dealloc(prim)
+ call mem_dealloc(diff_all)
+ call mem_dealloc(diff_l)
+ call mem_dealloc(diff)
+ call mem_dealloc(prim_all)
+ call mem_dealloc(prim)
 ! 
 ! if(System%post_SCF) then
 ! 
@@ -417,12 +576,13 @@ integer :: i,j,k
 ! 
 ! endif
 ! 
-! call mem_dealloc(exp_reorder)
-! 
-! call print_System(System,Control%LPRINT)
-! 
-! call print_EndSection
-! 
+ call mem_dealloc(exp_reorder)
+ call mem_dealloc(n_orbs)
+ 
+ call print_System(System,Control%LPRINT)
+ 
+ call print_EndSection
+   
 end subroutine create_System
 
 subroutine sort_prim(n,prim,diff,compare_prim)
@@ -474,19 +634,18 @@ do while(j<=n)
    diff_type = diff(j)
    if(diff_type==0.or.diff_type>10) then
 
-      if(diff_type>10) then
-         do i=diff_type/10,mod(diff_type,10)
-            prim(i,j-1) = max(prim(i,j-1),prim(i,j))
+         if(diff_type>10) then
+            do i=diff_type/10,mod(diff_type,10)
+               prim(i,j-1) = max(prim(i,j-1),prim(i,j))
+            enddo
+         endif
+
+         do i=j,n-1
+            prim(:,i) = prim(:,i+1)
+            diff(i)   = diff(i+1)
          enddo
-      endif
 
-      do i=j,n-1
-         prim(:,i) = prim(:,i+1)
-         diff(i)   = diff(i+1)
-      enddo
-
-      n = n - 1
-
+         n = n - 1
    else
 
       j = j + 1
@@ -501,6 +660,45 @@ if(any(diff(1:n)==0).or.any(diff(1:n)>10)) then
 endif
 
 end subroutine reduce_prim
+
+subroutine reduce_prim_l(n,prim,diff)
+implicit none
+integer :: n
+integer :: prim(:,:),diff(:)
+integer :: diff_type
+integer :: i,j
+
+j = 2
+do while(j<=n)
+   diff_type = diff(j)
+   if((diff_type==0.or.diff_type>10).and.(prim(3,j-1).eq.prim(3,j))) then
+
+         if(diff_type>10) then
+            do i=diff_type/10,mod(diff_type,10)
+               prim(i,j-1) = max(prim(i,j-1),prim(i,j))
+            enddo
+         endif
+
+         do i=j,n-1
+            prim(:,i) = prim(:,i+1)
+            diff(i)   = diff(i+1)
+         enddo
+
+         n = n - 1
+   else
+
+      j = j + 1
+
+   endif
+enddo
+
+!if(any(diff(1:n)==0).or.any(diff(1:n)>10)) then
+!   write(LOUT,'(a)') &
+!        'ERROR!!! Primitives have not been reduced properly in reduce_prim!'
+!   stop
+!endif
+
+end subroutine reduce_prim_l
 
 subroutine create_OrbSystem(OrbSystem,n,prim)
 implicit none
@@ -561,6 +759,77 @@ do i=1,Nexp
 enddo
 
 end subroutine create_OrbReduced
+
+subroutine create_OrbReduced_l(OrbReduced,n,prim,Nexp,maxl,isUsed)
+implicit none
+type(OrbReducedData) :: OrbReduced(:)
+integer,intent(in) :: n
+integer,intent(in) :: prim(:,:)
+integer,intent(in) :: Nexp, maxl
+logical,intent(in) :: isUsed(:,:)
+integer :: i,j,k,tmp
+integer :: cnt,off_one,off_two
+integer :: nlang, iexp
+
+!fill OrbReduced
+off_one=0
+cnt = Nexp 
+do i=1,cnt
+   associate(OrbReduced => OrbReduced(i))
+   iexp = prim(1,i+off_one)
+   OrbReduced%iexp = iexp
+   OrbReduced%isUsed = .true.
+   nlang = 1
+
+! get nlang for every iexp
+  off_two = off_one
+   do j=1,maxl+1
+      if(i+off_one+j.gt.n) exit
+
+      tmp = prim(1,i+off_one+j)
+      if(iexp.eq.tmp) then
+        nlang = nlang + 1
+        off_one = off_one + 1
+
+      else
+        exit
+      endif
+   enddo
+
+ OrbReduced%nlang = nlang
+ allocate(OrbReduced%lang(nlang),OrbReduced%max_lrange(nlang))
+
+! fill lang and max_lrange for every iexp 
+   do k=1,nlang
+      OrbReduced%lang(k) = prim(3,i+off_two+k-1)
+      OrbReduced%max_lrange(k) = prim(2,i+off_two+k-1) + OrbReduced%lang(k)
+   enddo
+ 
+ OrbReduced%maxrange = maxval(OrbReduced%max_lrange,nlang)
+  end associate
+
+enddo
+
+! check OrbReduced manually
+! do i=1,Nexp
+!  write(*,*) 'iexp       =',  OrbReduced(i)%iexp
+!  write(*,*) 'nlang      =',  OrbReduced(i)%nlang
+!  write(*,*) 'lang       =',   OrbReduced(i)%lang
+!  write(*,*) 'max_lrange =',   OrbReduced(i)%max_lrange
+!  write(*,*) 'maxrange   =',   OrbReduced(i)%maxrange
+!  write(*,'()')
+! enddo
+
+
+do i=1,Nexp
+   if(OrbReduced(i)%isUsed.neqv.(any(isUsed(i,:)))) then
+      write(LOUT,'(a)') &
+           'ERROR!!! Used orbital exponents have not been predicted properly!'
+      stop
+   endif
+enddo
+
+end subroutine create_OrbReduced_l
 
 subroutine add_OrbReduced(n,prim,Nexp,OrbReduced)
 implicit none
