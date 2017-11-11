@@ -20,6 +20,19 @@ real(prec),allocatable :: exponents(:)
 real(prec) :: RESULT_energy
 type(SCForbitalsData),pointer :: RESULT_extend
 
+type Problem_l_Data
+real(prec), allocatable :: H(:,:)
+real(prec), allocatable :: S(:,:)
+real(prec), allocatable :: D(:,:)
+end type Problem_l_Data 
+
+type Problem_ll_Data
+real(prec), allocatable :: J(:,:)
+end type Problem_ll_Data
+
+type(Problem_l_Data),allocatable :: problem_l(:)
+type(Problem_ll_Data),allocatable :: problem_ll(:)
+
 contains
 
 subroutine calculateSCF(System,Control,SCForbitals)
@@ -86,9 +99,9 @@ integer :: i
           stop
        endif
     enddo
-    write(LOUT,*) 'TEST?' 
-!    call SCF_energy_common(System%norb,System%OrbSystem(1),System%OrbReduced,&
-!         Control,fullPRINT)
+
+    call SCF_energy_common(System%maxl,System%norb,System%OrbSystem_L,System%OrbReduced,&
+         Control,fullPRINT)
 
   else
     do i=1,System%maxl+1
@@ -137,38 +150,72 @@ integer :: i
 
 end subroutine chooseSCF
 
-subroutine SCF_energy_common(norb,OrbSystem,OrbReduced,Control,fullPRINT)
+subroutine SCF_energy_common(maxl,norb,OrbSystem_L,OrbReduced,Control,fullPRINT)
 implicit none
-integer,intent(in) :: norb
-type(OrbSystemData),intent(in) :: OrbSystem
+integer :: maxl
+!integer,intent(in) :: norb
+integer,intent(in) :: norb(:)
+!type(OrbSystemData),intent(in) :: OrbSystem
+type(OrbSystemData_L),intent(in) :: OrbSystem_L(:)
 type(OrbReducedData),intent(in) :: OrbReduced(:)
 type(ControlData),intent(in) :: Control
 logical,intent(in) :: fullPRINT
 integer :: LPRINT_mod
-integer :: nbas
+!integer :: nbas
+integer,allocatable :: nbas(:)
 logical :: converged
 real(prec) :: energy
 real(prec),allocatable :: matH(:,:),matS(:,:),twoel(:,:)
 real(prec),allocatable :: eval(:),evec(:,:)
 real(prec),allocatable :: matF(:,:),matG(:,:),dens(:,:)
-integer :: i
+integer :: i, j, k
 integer :: i1,j1,i2,j2,ij2
 
 LPRINT_mod = merge(Control%LPRINT,0,fullPRINT)
 
 !nbas = OrbSystem%nbas
 
-call mem_alloc(matH,nbas,nbas)
-call mem_alloc(matS,nbas,nbas)
-call mem_alloc(twoel,nbas**2,nbas**2)
+allocate(nbas(maxl+1))
+
+do i=1,maxl+1
+ nbas(i) = OrbSystem_L(i)%OrbSystem(1)%nbas
+enddo
+
+allocate(problem_l(maxl+1))
+do i=1,maxl+1
+   call mem_alloc(problem_l(i)%H,nbas(i),nbas(i))
+   call mem_alloc(problem_l(i)%S,nbas(i),nbas(i))
+! add twoel!
+enddo
+
+! hapka: old_drake
+!call mem_alloc(matH,nbas,nbas)
+!call mem_alloc(matS,nbas,nbas)
+!call mem_alloc(twoel,nbas**2,nbas**2)
 
 call create_SCFint(Nexp,exponents,OrbReduced,LPRINT_mod)
+
+do i=1,maxl+1
+  associate(&
+       matH => problem_l(i)%H, &
+       matS => problem_l(i)%S, &
+       OrbSystem => OrbSystem_L(i)%OrbSystem(1), &
+       lorb1 => OrbSystem_L(i)%lorb, &
+       lorb2 => OrbSystem_L(i)%lorb )
+
+      call SCFint_matS(matS,OrbSystem,OrbSystem,lorb1,lorb2)
+      call SCFint_matH(matH,OrbSystem,OrbSystem,nucZ,lorb1,lorb2)
+
+  end associate
+enddo
+
+  
 
 !call SCFint_matH(matH,OrbSystem,OrbSystem,nucZ)
 !call SCFint_matS(matS,OrbSystem,OrbSystem)
 !call SCFint_matJ(twoel,OrbSystem,OrbSystem,OrbSystem,OrbSystem)
 
-!call free_SCFint
+call free_SCFint
 
 !call mem_alloc(eval,nbas)
 !call mem_alloc(evec,nbas,nbas)
@@ -225,9 +272,18 @@ call create_SCFint(Nexp,exponents,OrbReduced,LPRINT_mod)
 !call mem_dealloc(evec)
 !call mem_dealloc(eval)
 
-call mem_dealloc(twoel)
-call mem_dealloc(matS)
-call mem_dealloc(matH)
+!call mem_dealloc(twoel)
+!call mem_dealloc(matS)
+!call mem_dealloc(matH)
+
+do i=1,maxl+1
+   call mem_dealloc(problem_l(i)%H)
+   call mem_dealloc(problem_l(i)%S)
+enddo
+
+
+deallocate(problem_l)
+deallocate(nbas)
 
 end subroutine SCF_energy_common
 

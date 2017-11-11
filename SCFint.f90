@@ -25,6 +25,11 @@ integer :: ijrange
 real(prec),allocatable :: elms(:)
 end type OneIntData
 
+type TwoInt_t_Data
+real(prec),allocatable :: elms(:,:)
+integer :: two_t
+end type TwoInt_t_Data
+
 type TwoIntData
 logical :: isUsed
 integer :: iexp,jexp,kexp,lexp
@@ -32,6 +37,7 @@ logical :: same_exp
 real(prec) :: ijalpha,klalpha
 integer :: ijrange,klrange
 real(prec),allocatable :: elms(:,:)
+!type(TwoInt_t_Data),allocatable :: t_val 
 end type TwoIntData
 
 type(OneIntData),allocatable :: OneInt(:)
@@ -47,8 +53,8 @@ type(OrbReducedData),intent(in) :: OrbReduced(:)
 integer,intent(in) :: LPRINT
 
 call init_OneInt(Nexp)
-!call create_OneInt(Nexp,exponents,OrbReduced)
-!call print_OneInt(LPRINT)
+call create_OneInt(Nexp,exponents,OrbReduced)
+call print_OneInt(LPRINT)
 
 !call init_TwoInt(Nexp)
 !call create_TwoInt(Nexp,exponents,OrbReduced)
@@ -59,17 +65,18 @@ end subroutine create_SCFint
 subroutine free_SCFint
 implicit none
 
-call free_TwoInt
+!call free_TwoInt
 
 call free_OneInt
 
 end subroutine free_SCFint
 
-subroutine SCFint_matH(matH,iOrbSystem,jOrbSystem,nucZ)
+subroutine SCFint_matH(matH,iOrbSystem,jOrbSystem,nucZ,lorb1,lorb2)
 implicit none
 real(prec) :: matH(:,:)
 type(OrbSystemData),intent(in) :: iOrbSystem,jOrbSystem
 real(prec),intent(in) :: nucZ
+integer,intent(in),optional :: lorb1,lorb2
 integer :: i_prim,j_prim
 integer :: iexp,jexp,ijmin,ijmax
 logical :: ijorder
@@ -86,6 +93,8 @@ do j_prim=1,jOrbSystem%n_prim
 
         iexp = iOrbSpec%iexp
         jexp = jOrbSpec%iexp
+
+      ! write(*,*) iexp,jexp,i_prim,j_prim
 
         ijmin = min(iexp,jexp)
         ijmax = max(iexp,jexp)
@@ -118,16 +127,17 @@ do j_prim=1,jOrbSystem%n_prim
              do i=0,iOrbSpec%irange
                 ipos = ipos + 1
 
-                aPL = i + j
-                aMI = i - j
+                aPL = i + j + lorb1 + lorb2
+                aMI = i - j + lorb1 - lorb2
 
-                ijelms = offsetOne + aPL
+                ijelms = offsetOne + aPL  
 
                 A1  = A1_pre + alphaPL*(aPL+2) + alphaMI*aMI
                 tmp = A0*One%elms(ijelms) + A1*One%elms(ijelms - 1)
 
                 if(aPL>0) then
-                   A2  = -(aPL**2 + aMI**2)/2 - aPL
+                   A2  = -(aPL**2 + aMI**2)/2 - aPL & 
+                       & + lorb1*(lorb1 + 1) + lorb2*(lorb2 + 1)
                    tmp = tmp + A2*One%elms(ijelms - 2)
                 endif
 
@@ -144,13 +154,15 @@ enddo
 
 end subroutine SCFint_matH
 
-subroutine SCFint_matS(matS,iOrbSystem,jOrbSystem)
+subroutine SCFint_matS(matS,iOrbSystem,jOrbSystem,lorb1,lorb2)
 implicit none
 real(prec) :: matS(:,:)
 type(OrbSystemData),intent(in) :: iOrbSystem,jOrbSystem
+integer,intent(in),optional :: lorb1, lorb2
 integer :: i_prim,j_prim
 integer :: iexp,jexp,ijmin,ijmax
 integer :: i,j,ipos,jpos
+
 
 do j_prim=1,jOrbSystem%n_prim
    do i_prim=1,iOrbSystem%n_prim
@@ -183,7 +195,7 @@ do j_prim=1,jOrbSystem%n_prim
              do i=0,iOrbSpec%irange
                 ipos = ipos + 1
 
-                matS(ipos,jpos) = One%elms(offsetOne + i + j)
+                matS(ipos,jpos) = One%elms(offsetOne + i + j + lorb1 + lorb2)
 
              enddo
           enddo
@@ -524,11 +536,39 @@ deallocate(TwoInt)
 
 end subroutine free_TwoInt
 
+subroutine choose_maxrange(iOrbSpec,jOrbSpec,maxrange,doint)
+implicit none
+type(OrbReducedData) :: iOrbSpec,jOrbSpec
+logical :: doint
+integer :: maxrange, tmp
+integer :: iang, jang
+
+maxrange=0
+doint=.false.
+
+do jang=1,jOrbSpec%nlang
+   do iang=1,iOrbSpec%nlang
+   if(jOrbSpec%lang(jang).eq.iOrbSpec%lang(iang)) then
+     tmp=maxrange
+     maxrange = jOrbSpec%max_lrange(jang) + iOrbSpec%max_lrange(iang)
+     if(tmp.gt.maxrange) maxrange=tmp
+     doint=.true.
+!   else
+!    doint=.false.
+   endif
+
+   enddo
+enddo
+
+end subroutine choose_maxrange
+
 subroutine create_OneInt(Nexp,exponents,OrbReduced)
 implicit none
 integer,intent(in) :: Nexp
 real(prec),intent(in) :: exponents(:)
 type(OrbReducedData),intent(in) :: OrbReduced(:)
+logical :: doint
+integer :: maxrange
 integer :: iOne
 integer :: iexp,jexp
 integer :: i
@@ -540,7 +580,9 @@ do jexp=1,Nexp
       associate(&
            iOrbSpec => OrbReduced(iexp), &
            jOrbSpec => OrbReduced(jexp))
-        if(iOrbSpec%isUsed.and.jOrbSpec%isUsed) then
+           call choose_maxrange(iOrbSpec,jOrbSpec,maxrange,doint)
+         ! write(LOUT,'(a,i3,1x,a,i3,1x,a,i3,2x,a,l3)') 'iexp', iexp, 'jexp', jexp, 'maxrng: ', maxrange, 'doint: ', doint
+        if(iOrbSpec%isUsed.and.jOrbSpec%isUsed.and.doint) then
            associate(One => OneInt(iOne))
 
              One%isUsed    = .true.
@@ -548,7 +590,8 @@ do jexp=1,Nexp
              One%jexp      = jOrbSpec%iexp
              One%ijalphaPL = exponents(One%iexp) + exponents(One%jexp)
              One%ijalphaMI = exponents(One%iexp) - exponents(One%jexp)
-             One%ijrange   = iOrbSpec%maxrange   + jOrbSpec%maxrange
+            !One%ijrange   = iOrbSpec%maxrange   + jOrbSpec%maxrange
+             One%ijrange   = maxrange 
 
              call mem_alloc(One%elms,One%ijrange-smallestOne+1)
 
@@ -561,11 +604,43 @@ do jexp=1,Nexp
       end associate
    enddo
 enddo
+
 if(iOne/=size(OneInt)) then
    write(LOUT,'(a)') 'ERROR!!! &
         &Number of entries in SCF OneInt has not been predicted correctly!'
    stop
 endif
+
+! hapka: old_drake
+!iOne = 0
+!do jexp=1,Nexp
+!   do iexp=1,jexp
+!      iOne = iOne + 1
+!      associate(&
+!           iOrbSpec => OrbReduced(iexp), &
+!           jOrbSpec => OrbReduced(jexp))
+!        if(iOrbSpec%isUsed.and.jOrbSpec%isUsed) then
+!           associate(One => OneInt(iOne))
+!
+!             One%isUsed    = .true.
+!             One%iexp      = iOrbSpec%iexp
+!             One%jexp      = jOrbSpec%iexp
+!             One%ijalphaPL = exponents(One%iexp) + exponents(One%jexp)
+!             One%ijalphaMI = exponents(One%iexp) - exponents(One%jexp)
+!             One%ijrange   = iOrbSpec%maxrange   + jOrbSpec%maxrange
+!
+!             call mem_alloc(One%elms,One%ijrange-smallestOne+1)
+!
+!             do i=smallestOne,One%ijrange
+!                One%elms(offsetOne + i) = int1_slater(i,One%ijalphaPL)
+!             enddo
+!
+!           end associate
+!        endif
+!      end associate
+!   enddo
+!enddo
+
 
 end subroutine create_OneInt
 
@@ -682,7 +757,7 @@ if(LPRINT>=10) then
                 One%iexp,One%jexp,One%ijalphaPL,One%ijalphaMI,One%ijrange
            if(LPRINT>=100) then
               do i=smallestOne,One%ijrange
-                 write(LOUT,'(10x,i3,a,es30.22)') i,' : ',&
+                 write(LOUT,'(10x,i3,a,es45.33)') i,' : ',&
                       One%elms(offsetOne + i)
               enddo
            endif

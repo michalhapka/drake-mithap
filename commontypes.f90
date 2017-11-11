@@ -13,6 +13,7 @@ public compare_prim_orbs_l
 public ControlData,fill_Control
 public SystemData,init_System,free_System,print_System,print_SystemExponents
 public OrbSystemData,OrbSpecData,OrbReducedData
+public OrbSystemData_L
 public PairSystemData,PairSpecData,PairReducedData
 public check_PairSystem,check_consistency_PairReduced
 public increment_PairSpec
@@ -1785,7 +1786,7 @@ type(OrbSystemData) :: OrbSystem
 integer :: LPRINT, lorb
 integer :: i
 
-write(LOUT, '(a,1x,a)') 'Orbital type:                 ', get_angmom_name(lorb)
+write(LOUT, '(a,1x,a)') 'Orbital type:           ', get_angmom_name(lorb)
 write(LOUT,'(a,i5)')  'Number of basis functions: ',OrbSystem%nbas
 write(LOUT,'(a,i5)') 'Number of primitives:      ',OrbSystem%n_prim
 
