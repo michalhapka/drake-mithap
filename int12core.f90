@@ -58,7 +58,7 @@ do i=0,(c+1)/2
 enddo
 tmp = ratio*tmp
 
-intval = tmp/2
+intval = tmp
 
 prec_intval = intval
 

@@ -15,7 +15,8 @@ integer,parameter :: offsetOne   = 1 - smallestOne
 
 integer,parameter :: smallestTwo_uv = 0
 integer,parameter :: offsetTwo_uv   = 1 - smallestTwo_uv
-integer,parameter :: onlyTwo_t      = -1
+!integer,parameter :: onlyTwo_t      = -1
+integer,parameter :: smallestTwo_t      = -1
 
 type OneIntData
 logical :: isUsed
@@ -27,6 +28,7 @@ end type OneIntData
 
 type TwoInt_t_Data
 real(prec),allocatable :: elms(:,:)
+integer :: shift
 integer :: two_t
 end type TwoInt_t_Data
 
@@ -36,8 +38,8 @@ integer :: iexp,jexp,kexp,lexp
 logical :: same_exp
 real(prec) :: ijalpha,klalpha
 integer :: ijrange,klrange
-real(prec),allocatable :: elms(:,:)
-!type(TwoInt_t_Data),allocatable :: t_val 
+!real(prec),allocatable :: elms(:,:)
+type(TwoInt_t_Data),allocatable :: t_val(:) 
 end type TwoIntData
 
 type(OneIntData),allocatable :: OneInt(:)
@@ -56,16 +58,16 @@ call init_OneInt(Nexp)
 call create_OneInt(Nexp,exponents,OrbReduced)
 call print_OneInt(LPRINT)
 
-!call init_TwoInt(Nexp)
-!call create_TwoInt(Nexp,exponents,OrbReduced)
-!call print_TwoInt(LPRINT)
+call init_TwoInt(Nexp)
+call create_TwoInt(Nexp,exponents,OrbReduced)
+call print_TwoInt(LPRINT)
 
 end subroutine create_SCFint
 
 subroutine free_SCFint
 implicit none
 
-!call free_TwoInt
+call free_TwoInt
 
 call free_OneInt
 
@@ -281,9 +283,9 @@ do l_prim=1,lOrbSystem%n_prim
                             do i=0,iOrbSpec%irange
                                ijpos = ijpos + 1
 
-                               matJ(ijpos,klpos) = Two%elms( &
-                                    offsetTwo_uv + i + j, &
-                                    klelms)
+!                               matJ(ijpos,klpos) = Two%elms( &
+!                                    offsetTwo_uv + i + j, &
+!                                    klelms)
 
                             enddo
                             jpos = jpos + i_nbas
@@ -309,9 +311,9 @@ do l_prim=1,lOrbSystem%n_prim
                             do i=0,iOrbSpec%irange
                                ijpos = ijpos + 1
 
-                               matJ(ijpos,klpos) = Two%elms( &
-                                    klelms, &
-                                    offsetTwo_uv + i + j)
+!                               matJ(ijpos,klpos) = Two%elms( &
+!                                    klelms, &
+!                                    offsetTwo_uv + i + j)
 
                             enddo
                             jpos = jpos + i_nbas
@@ -405,9 +407,9 @@ do l_prim=1,lOrbSystem%n_prim
                             do i=0,iOrbSpec%irange
                                ijpos = ijpos + 1
 
-                               matK(ijpos,klpos) = Two%elms( &
-                                    offsetTwo_uv + i + k, &
-                                    jlelms)
+!                               matK(ijpos,klpos) = Two%elms( &
+!                                    offsetTwo_uv + i + k, &
+!                                    jlelms)
 
                             enddo
                             jpos = jpos + i_nbas
@@ -432,9 +434,9 @@ do l_prim=1,lOrbSystem%n_prim
                             do i=0,iOrbSpec%irange
                                ijpos = ijpos + 1
 
-                               matK(ijpos,klpos) = Two%elms( &
-                                    jlelms, &
-                                    offsetTwo_uv + i + k)
+!                               matK(ijpos,klpos) = Two%elms( &
+!                                    jlelms, &
+!                                    offsetTwo_uv + i + k)
 
                             enddo
                             jpos = jpos + i_nbas
@@ -522,12 +524,22 @@ end subroutine init_TwoInt
 
 subroutine free_TwoInt
 implicit none
-integer :: iTwo
+integer :: iTwo, j
 
 do iTwo=1,size(TwoInt)
    associate(Two => TwoInt(iTwo))
 
-     if(Two%isUsed) call mem_dealloc(Two%elms)
+      if(Two%isUsed) then
+
+         do j=1,size(Two%t_val)
+            call mem_dealloc(Two%t_val(j)%elms)
+         enddo
+
+         deallocate(Two%t_val)
+      endif
+
+! hapka: old_drake
+!     if(Two%isUsed) call mem_dealloc(Two%elms)
 
    end associate
 enddo
@@ -541,20 +553,18 @@ implicit none
 type(OrbReducedData) :: iOrbSpec,jOrbSpec
 logical :: doint
 integer :: maxrange, tmp
-integer :: iang, jang
+integer :: ival, jval
 
 maxrange=0
 doint=.false.
 
-do jang=1,jOrbSpec%nlang
-   do iang=1,iOrbSpec%nlang
-   if(jOrbSpec%lang(jang).eq.iOrbSpec%lang(iang)) then
+do jval=1,jOrbSpec%nlang
+   do ival=1,iOrbSpec%nlang
+   if(jOrbSpec%lang(jval).eq.iOrbSpec%lang(ival)) then
      tmp=maxrange
-     maxrange = jOrbSpec%max_lrange(jang) + iOrbSpec%max_lrange(iang)
+     maxrange = jOrbSpec%max_lrange(jval) + iOrbSpec%max_lrange(ival)
      if(tmp.gt.maxrange) maxrange=tmp
      doint=.true.
-!   else
-!    doint=.false.
    endif
 
    enddo
@@ -581,7 +591,6 @@ do jexp=1,Nexp
            iOrbSpec => OrbReduced(iexp), &
            jOrbSpec => OrbReduced(jexp))
            call choose_maxrange(iOrbSpec,jOrbSpec,maxrange,doint)
-         ! write(LOUT,'(a,i3,1x,a,i3,1x,a,i3,2x,a,l3)') 'iexp', iexp, 'jexp', jexp, 'maxrng: ', maxrange, 'doint: ', doint
         if(iOrbSpec%isUsed.and.jOrbSpec%isUsed.and.doint) then
            associate(One => OneInt(iOne))
 
@@ -644,6 +653,109 @@ endif
 
 end subroutine create_OneInt
 
+subroutine choose_maxrange_max4l(iOrbSpec,jOrbSpec,kOrbSpec,lOrbSpec,&
+                               & Max4lOdd,Max4lEven,maxrange1,maxrange2,doint)
+
+implicit none
+type(OrbReducedData) :: iOrbSpec,jOrbSpec
+type(OrbReducedData) :: kOrbSpec,lOrbSpec
+logical :: doint
+integer :: Max4lOdd, Max4lEven
+integer :: TmpOdd, TmpEven
+integer :: maxrange1, maxrange2
+integer :: tmp0, tmp1, tmp2
+integer :: ival, jval, kval, lval
+integer :: ijM, klM, ijP, klP
+
+ Max4lEven = -1
+ Max4lOdd  = -1
+ maxrange1=0
+ maxrange2=0
+ doint=.false.
+ do lval=1,lOrbSpec%nlang
+    do kval=1,kOrbSpec%nlang
+       do jval=1,jOrbSpec%nlang
+          do ival=1,iOrbSpec%nlang
+
+             ijM = abs(iOrbSpec%lang(ival)-jOrbSpec%lang(jval))
+             klM = abs(kOrbSpec%lang(kval)-lOrbSpec%lang(lval))
+             ijP = iOrbSpec%lang(ival)+jOrbSpec%lang(jval)
+             klP = kOrbSpec%lang(kval)+lOrbSpec%lang(lval)
+
+             ! check parity condition
+             if(mod(ijP+klP,2).eq.0) then
+
+                ! check coupling condition
+                if(max(ijM,klM).le.min(ijP,klP)) then
+                   tmp0=ijP+klP
+                   if(mod(tmp0/2,2).eq.0) then
+                      TmpEven = tmp0
+                      if(TmpEven.gt.Max4lEven) Max4lEven = TmpEven
+                   else
+                      TmpOdd = tmp0
+                      if(TmpOdd.gt.Max4lOdd) Max4lOdd = TmpOdd
+                   endif
+
+
+
+                   tmp1=maxrange1
+                   tmp2=maxrange2
+                   maxrange1 = jOrbSpec%max_lrange(jval) + iOrbSpec%max_lrange(ival)
+                   maxrange2 = kOrbSpec%max_lrange(kval) + lOrbSpec%max_lrange(lval)
+   !               write(*,'(a,*(i7))') '(ij|kl):', iexp, jexp, kexp, lexp 
+   !               print*, "max_ij, max_kl", maxrange1, maxrange2
+                   if(tmp1.gt.maxrange1) maxrange1 = tmp1
+                   if(tmp2.gt.maxrange2) maxrange2 = tmp2
+                   doint=.true.
+                endif
+
+             endif
+
+          enddo
+       enddo
+    enddo
+ enddo
+
+end subroutine choose_maxrange_max4l
+
+subroutine get_range_shift(Max4lEven,Max4lOdd,shift)
+implicit none
+integer :: Max4lEven, Max4lOdd
+integer :: Max4l
+integer :: shift(:)
+integer,allocatable :: ShiftEven(:), ShiftOdd(:)
+integer :: i
+
+ Max4l=max(Max4lEven,Max4lOdd)
+ allocate(ShiftEven(Max4l/2+1),ShiftOdd(Max4l/2+1))
+
+ ShiftEven = -huge(0)
+ ShiftOdd  = -huge(0)
+
+ if(Max4lEven.ge.0) then
+    do i=0,Max4lEven/2
+
+       ShiftEven(i+1) = -(i/2)*2
+
+    enddo
+ endif
+
+ if(Max4lOdd.ge.0) then
+    do i=0,Max4lOdd/2
+
+       ShiftOdd(i+1) = 1 - ((1+i)/2)*2
+
+    enddo
+ endif
+
+ do i=1,Max4l/2+1
+    shift(i) = max(ShiftEven(i),ShiftOdd(i))
+ enddo
+
+ deallocate(ShiftEven,ShiftOdd)
+
+end subroutine get_range_shift
+
 subroutine create_TwoInt(Nexp,exponents,OrbReduced)
 implicit none
 integer,intent(in) :: Nexp
@@ -651,7 +763,12 @@ real(prec),intent(in) :: exponents(:)
 type(OrbReducedData),intent(in) :: OrbReduced(:)
 integer :: iTwo
 integer :: iexp,jexp,kexp,lexp
-integer :: i,j
+logical :: doint
+integer :: max4l,Max4lEven,Max4lOdd
+integer :: maxrange_ij,maxrange_kl
+integer, allocatable :: shift(:)
+integer :: currentTwo_t
+integer :: i,j,k
 
 iTwo = 0
 do lexp=1,Nexp
@@ -664,8 +781,15 @@ do lexp=1,Nexp
                  jOrbSpec => OrbReduced(jexp), &
                  kOrbSpec => OrbReduced(kexp), &
                  lOrbSpec => OrbReduced(lexp))
+                 call choose_maxrange_max4l(iOrbSpec,jOrbSpec,kOrbSpec,lOrbSpec, &
+                      & Max4lOdd,Max4lEven,maxrange_ij,maxrange_kl,doint)
+                ! if(doint) then
+                !    write(*,'(a,*(i7))') '(ij|kl) ', iexp,jexp,kexp,lexp
+                !    write(*,'(a,*(i7))') 'max4l ', max4l,maxrange_ij,maxrange_kl
+                ! endif
+                ! write(*,*) 'doint ', doint
               if(iOrbSpec%isUsed.and.jOrbSpec%isUsed.and.&
-                   kOrbSpec%isUsed.and.lOrbSpec%isUsed) then
+                   kOrbSpec%isUsed.and.lOrbSpec%isUsed.and.doint) then
                  associate(Two => TwoInt(iTwo))
 
                    Two%isUsed   = .true.
@@ -676,49 +800,74 @@ do lexp=1,Nexp
                    Two%same_exp = (Two%iexp==Two%kexp).and.(Two%jexp==Two%lexp)
                    Two%ijalpha  = exponents(Two%iexp) + exponents(Two%jexp)
                    Two%klalpha  = exponents(Two%kexp) + exponents(Two%lexp)
-                   Two%ijrange  = iOrbSpec%maxrange   + jOrbSpec%maxrange
-                   Two%klrange  = kOrbSpec%maxrange   + lOrbSpec%maxrange
+                   Two%ijrange  = maxrange_ij
+                   Two%klrange  = maxrange_kl
+                  !Two%ijrange  = iOrbSpec%maxrange   + jOrbSpec%maxrange
+                  !Two%klrange  = kOrbSpec%maxrange   + lOrbSpec%maxrange
 
-                   call mem_alloc(Two%elms,&
-                        Two%ijrange-smallestTwo_uv+1,&
-                        Two%klrange-smallestTwo_uv+1)
+                   max4l = max(Max4lOdd,Max4lEven)
+                   allocate(shift(max4l/2+1))
 
-                   if(Two%same_exp) then
+                   call get_range_shift(Max4lEven,Max4lOdd,shift)                   
+                   allocate(Two%t_val(1+max4l/2))
 
-                      do j=smallestTwo_uv,Two%klrange
-                         do i=smallestTwo_uv,min(j,Two%ijrange)
-                            Two%elms(offsetTwo_uv + i,offsetTwo_uv + j) = &
-                                 int2_slater(i,j,onlyTwo_t,&
-                                 Two%ijalpha,Two%klalpha)
+                   do i=1,max4l/2+1  
+                      associate( tval => Two%t_val(i) )
+                      tval%shift = shift(i)
+                      tval%two_t = 2*i-3
+                      call mem_alloc(tval%elms, &
+                           Two%ijrange+tval%shift-smallestTwo_uv+1,&
+                           Two%klrange+tval%shift-smallestTwo_uv+1)
+                      end associate
+                   enddo
+
+                   do k=1,max4l/2+1
+
+                      currentTwo_t = 2*k-3
+
+                      if(Two%same_exp) then
+   
+                         do j=smallestTwo_uv,Two%klrange+shift(k)
+                            do i=smallestTwo_uv,min(j,Two%ijrange+shift(k))
+                               Two%t_val(k)%elms(offsetTwo_uv + i,offsetTwo_uv + j) = &
+                                    !int2_slater(i,j,onlyTwo_t,&
+                                   int2_slater(i,j,currentTwo_t,&
+                                   Two%ijalpha,Two%klalpha)
+                            enddo
                          enddo
-                      enddo
-                      do j=smallestTwo_uv,min(Two%ijrange,Two%klrange)
-                         do i=j+1,min(Two%ijrange,Two%klrange)
-                            Two%elms(offsetTwo_uv + i,offsetTwo_uv + j) = &
-                                 Two%elms(offsetTwo_uv + j,offsetTwo_uv + i)
+                         do j=smallestTwo_uv,min(Two%ijrange+shift(k),Two%klrange+shift(k))
+                            do i=j+1,min(Two%ijrange+shift(k),Two%klrange+shift(k))
+                               Two%t_val(k)%elms(offsetTwo_uv + i,offsetTwo_uv + j) = &
+                                    Two%t_val(k)%elms(offsetTwo_uv + j,offsetTwo_uv + i)
+                            enddo
                          enddo
-                      enddo
-                      if(Two%ijrange>Two%klrange) then
-                         do j=smallestTwo_uv,Two%klrange
-                            do i=Two%klrange+1,Two%ijrange
-                               Two%elms(offsetTwo_uv + i,offsetTwo_uv + j) = &
-                                    int2_slater(i,j,onlyTwo_t,&
+                         if(Two%ijrange+shift(k)>Two%klrange+shift(k)) then
+                            do j=smallestTwo_uv,Two%klrange+shift(k)
+                               do i=Two%klrange+shift(k)+1,Two%ijrange+shift(k)
+                                  Two%t_val(k)%elms(offsetTwo_uv + i,offsetTwo_uv + j) = &
+                                       !int2_slater(i,j,onlyTwo_t,&
+                                      int2_slater(i,j,currentTwo_t,&
+                                      Two%ijalpha,Two%klalpha)
+                               enddo
+                            enddo
+                         endif
+   
+                      else
+   
+                         do j=smallestTwo_uv,Two%klrange+shift(k)
+                            do i=smallestTwo_uv,Two%ijrange+shift(k)
+                               Two%t_val(k)%elms(offsetTwo_uv + i,offsetTwo_uv + j) = &
+                                    !int2_slater(i,j,onlyTwo_t,&
+                                    int2_slater(i,j,currentTwo_t,&
                                     Two%ijalpha,Two%klalpha)
                             enddo
                          enddo
+   
                       endif
+                 
+                   enddo
 
-                   else
-
-                      do j=smallestTwo_uv,Two%klrange
-                         do i=smallestTwo_uv,Two%ijrange
-                            Two%elms(offsetTwo_uv + i,offsetTwo_uv + j) = &
-                                 int2_slater(i,j,onlyTwo_t,&
-                                 Two%ijalpha,Two%klalpha)
-                         enddo
-                      enddo
-
-                   endif
+                   deallocate(shift)
 
                  end associate
               endif
@@ -732,6 +881,90 @@ if(iTwo/=size(TwoInt)) then
         &Number of entries in SCF TwoInt has not been predicted correctly!'
    stop
 endif
+
+! hapka: old_drake
+! iTwo = 0
+! do lexp=1,Nexp
+!    do kexp=1,lexp
+!       do jexp=1,lexp
+!          do iexp=1,merge(kexp,jexp,jexp==lexp)
+!             iTwo = iTwo + 1
+!             associate(&
+!                  iOrbSpec => OrbReduced(iexp), &
+!                  jOrbSpec => OrbReduced(jexp), &
+!                  kOrbSpec => OrbReduced(kexp), &
+!                  lOrbSpec => OrbReduced(lexp))
+!               if(iOrbSpec%isUsed.and.jOrbSpec%isUsed.and.&
+!                    kOrbSpec%isUsed.and.lOrbSpec%isUsed) then
+!                  associate(Two => TwoInt(iTwo))
+! 
+!                    Two%isUsed   = .true.
+!                    Two%iexp     = iOrbSpec%iexp
+!                    Two%jexp     = jOrbSpec%iexp
+!                    Two%kexp     = kOrbSpec%iexp
+!                    Two%lexp     = lOrbSpec%iexp
+!                    Two%same_exp = (Two%iexp==Two%kexp).and.(Two%jexp==Two%lexp)
+!                    Two%ijalpha  = exponents(Two%iexp) + exponents(Two%jexp)
+!                    Two%klalpha  = exponents(Two%kexp) + exponents(Two%lexp)
+!                    Two%ijrange  = iOrbSpec%maxrange   + jOrbSpec%maxrange
+!                    Two%klrange  = kOrbSpec%maxrange   + lOrbSpec%maxrange
+! 
+!                    call mem_alloc(Two%elms,&
+!                         Two%ijrange-smallestTwo_uv+1,&
+!                         Two%klrange-smallestTwo_uv+1)
+! 
+!                    if(Two%same_exp) then
+! 
+!                       do j=smallestTwo_uv,Two%klrange
+!                          do i=smallestTwo_uv,min(j,Two%ijrange)
+!                             Two%elms(offsetTwo_uv + i,offsetTwo_uv + j) = &
+!                                  !int2_slater(i,j,onlyTwo_t,&
+!                                  int2_slater(i,j,smallestTwo_t,&
+!                                  Two%ijalpha,Two%klalpha)
+!                          enddo
+!                       enddo
+!                       do j=smallestTwo_uv,min(Two%ijrange,Two%klrange)
+!                          do i=j+1,min(Two%ijrange,Two%klrange)
+!                             Two%elms(offsetTwo_uv + i,offsetTwo_uv + j) = &
+!                                  Two%elms(offsetTwo_uv + j,offsetTwo_uv + i)
+!                          enddo
+!                       enddo
+!                       if(Two%ijrange>Two%klrange) then
+!                          do j=smallestTwo_uv,Two%klrange
+!                             do i=Two%klrange+1,Two%ijrange
+!                                Two%elms(offsetTwo_uv + i,offsetTwo_uv + j) = &
+!                                     !int2_slater(i,j,onlyTwo_t,&
+!                                     int2_slater(i,j,smallestTwo_t,&
+!                                     Two%ijalpha,Two%klalpha)
+!                             enddo
+!                          enddo
+!                       endif
+! 
+!                    else
+! 
+!                       do j=smallestTwo_uv,Two%klrange
+!                          do i=smallestTwo_uv,Two%ijrange
+!                             Two%elms(offsetTwo_uv + i,offsetTwo_uv + j) = &
+!                                  !int2_slater(i,j,onlyTwo_t,&
+!                                  int2_slater(i,j,smallestTwo_t,&
+!                                  Two%ijalpha,Two%klalpha)
+!                          enddo
+!                       enddo
+! 
+!                    endif
+! 
+!                  end associate
+!               endif
+!             end associate
+!          enddo
+!       enddo
+!    enddo
+! enddo
+! if(iTwo/=size(TwoInt)) then
+!    write(LOUT,'(a)') 'ERROR!!! &
+!         &Number of entries in SCF TwoInt has not been predicted correctly!'
+!    stop
+! endif
 
 end subroutine create_TwoInt
 
@@ -775,7 +1008,7 @@ subroutine print_TwoInt(LPRINT)
 implicit none
 integer,intent(in) :: LPRINT
 integer :: iTwo
-integer :: i,j
+integer :: i,j,k
 
 if(LPRINT>=10) then
 
@@ -793,12 +1026,17 @@ if(LPRINT>=10) then
                 Two%iexp,Two%jexp,Two%kexp,Two%lexp,&
                 Two%ijalpha,Two%ijrange,Two%klalpha,Two%klrange
            if(LPRINT>=100) then
-              do j=smallestTwo_uv,Two%klrange
-                 do i=smallestTwo_uv,Two%ijrange
-                    write(LOUT,'(10x,2i3,a,es30.22)') i,j,' : ',&
-                         Two%elms(offsetTwo_uv + i,offsetTwo_uv + j)
+              do k=1,size(Two%t_val)
+                 associate(tval => Two%t_val(k))
+                 do j=smallestTwo_uv,Two%klrange+tval%shift
+                    do i=smallestTwo_uv,Two%ijrange+tval%shift
+                       write(LOUT,'(10x,3i3,a,es30.22)') i,j,tval%two_t,' : ',&
+                            tval%elms(offsetTwo_uv + i,offsetTwo_uv + j)
+                    enddo
                  enddo
+                 end associate
               enddo
+
            endif
         else
            write(LOUT,'(a)') 'NOT USED'
