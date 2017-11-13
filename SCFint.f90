@@ -40,6 +40,7 @@ real(prec) :: ijalpha,klalpha
 integer :: ijrange,klrange
 !real(prec),allocatable :: elms(:,:)
 type(TwoInt_t_Data),allocatable :: t_val(:) 
+!type(TwoInt_t_Data),allocatable :: lam_val(:) 
 end type TwoIntData
 
 type(OneIntData),allocatable :: OneInt(:)
@@ -73,12 +74,12 @@ call free_OneInt
 
 end subroutine free_SCFint
 
-subroutine SCFint_matH(matH,iOrbSystem,jOrbSystem,nucZ,lorb1,lorb2)
+subroutine SCFint_matH(matH,iOrbSystem,jOrbSystem,nucZ)
 implicit none
 real(prec) :: matH(:,:)
 type(OrbSystemData),intent(in) :: iOrbSystem,jOrbSystem
 real(prec),intent(in) :: nucZ
-integer,intent(in),optional :: lorb1,lorb2
+integer :: iOrbl,jOrbl
 integer :: i_prim,j_prim
 integer :: iexp,jexp,ijmin,ijmax
 logical :: ijorder
@@ -92,6 +93,9 @@ do j_prim=1,jOrbSystem%n_prim
       associate(&
            iOrbSpec => iOrbSystem%OrbSpec(i_prim), &
            jOrbSpec => jOrbSystem%OrbSpec(j_prim))
+
+        iOrbl = iOrbSystem%lorb
+        jOrbl = jOrbSystem%lorb
 
         iexp = iOrbSpec%iexp
         jexp = jOrbSpec%iexp
@@ -129,8 +133,8 @@ do j_prim=1,jOrbSystem%n_prim
              do i=0,iOrbSpec%irange
                 ipos = ipos + 1
 
-                aPL = i + j + lorb1 + lorb2
-                aMI = i - j + lorb1 - lorb2
+                aPL = i + j + iOrbl + jOrbl
+                aMI = i - j + iOrbl - jOrbl
 
                 ijelms = offsetOne + aPL  
 
@@ -139,7 +143,7 @@ do j_prim=1,jOrbSystem%n_prim
 
                 if(aPL>0) then
                    A2  = -(aPL**2 + aMI**2)/2 - aPL & 
-                       & + lorb1*(lorb1 + 1) + lorb2*(lorb2 + 1)
+                       & + iOrbl*(iOrbl + 1) + jOrbl*(jOrbl + 1)
                    tmp = tmp + A2*One%elms(ijelms - 2)
                 endif
 
@@ -156,11 +160,11 @@ enddo
 
 end subroutine SCFint_matH
 
-subroutine SCFint_matS(matS,iOrbSystem,jOrbSystem,lorb1,lorb2)
+subroutine SCFint_matS(matS,iOrbSystem,jOrbSystem)
 implicit none
 real(prec) :: matS(:,:)
 type(OrbSystemData),intent(in) :: iOrbSystem,jOrbSystem
-integer,intent(in),optional :: lorb1, lorb2
+integer :: iOrbl, jOrbl
 integer :: i_prim,j_prim
 integer :: iexp,jexp,ijmin,ijmax
 integer :: i,j,ipos,jpos
@@ -171,6 +175,9 @@ do j_prim=1,jOrbSystem%n_prim
       associate(&
            iOrbSpec => iOrbSystem%OrbSpec(i_prim), &
            jOrbSpec => jOrbSystem%OrbSpec(j_prim))
+
+        iOrbl = iOrbSystem%lorb
+        jOrbl = jOrbSystem%lorb
 
         iexp = iOrbSpec%iexp
         jexp = jOrbSpec%iexp
@@ -197,7 +204,7 @@ do j_prim=1,jOrbSystem%n_prim
              do i=0,iOrbSpec%irange
                 ipos = ipos + 1
 
-                matS(ipos,jpos) = One%elms(offsetOne + i + j + lorb1 + lorb2)
+                matS(ipos,jpos) = One%elms(offsetOne + i + j + iOrbl + jOrbl)
 
              enddo
           enddo
@@ -210,16 +217,18 @@ enddo
 
 end subroutine SCFint_matS
 
-subroutine SCFint_matJ(matJ,iOrbSystem,jOrbSystem,kOrbSystem,lOrbSystem)
+subroutine SCFint_matJ(matJ,iOrbSystem,jOrbSystem,kOrbSystem,lOrbSystem,prefac)
 use misc, only : swap
 implicit none
 real(prec) :: matJ(:,:)
+real(prec),intent(in) :: prefac
 type(OrbSystemData),intent(in) :: iOrbSystem,jOrbSystem,kOrbSystem,lOrbSystem
 integer :: i_prim,j_prim,k_prim,l_prim
 integer :: iexp,jexp,kexp,lexp,ijmin,ijmax,klmin,klmax,ijexp,klexp
 logical :: ijklorder
 integer :: i_nbas,k_nbas
 integer :: i,j,k,l,ijpos,jpos,klpos,lpos,klelms
+integer :: lorb1,lorb2,lorb3,lorb4
 
 i_nbas = iOrbSystem%nbas
 k_nbas = kOrbSystem%nbas
@@ -233,6 +242,11 @@ do l_prim=1,lOrbSystem%n_prim
                  jOrbSpec => jOrbSystem%OrbSpec(j_prim), &
                  kOrbSpec => kOrbSystem%OrbSpec(k_prim), &
                  lOrbSpec => lOrbSystem%OrbSpec(l_prim))
+
+              lorb1 = iOrbSystem%lorb
+              lorb2 = jOrbSystem%lorb
+              lorb3 = kOrbSystem%lorb
+              lorb4 = lOrbSystem%lorb
 
               iexp = iOrbSpec%iexp
               jexp = jOrbSpec%iexp
@@ -254,6 +268,7 @@ do l_prim=1,lOrbSystem%n_prim
                  call swap(ijexp,klexp)
               endif
 
+              !associate(Two => TwoInt(ijexp + klexp*(klexp-1)/2))
               associate(Two => TwoInt(ijexp + klexp*(klexp-1)/2))
                 if(.not.Two%isUsed) then
                    write(LOUT,'(a)') 'ERROR!!! &
@@ -275,7 +290,8 @@ do l_prim=1,lOrbSystem%n_prim
                       do k=0,kOrbSpec%irange
                          klpos = klpos + 1
 
-                         klelms = offsetTwo_uv + k + l
+                         klelms = offsetTwo_uv + k + l + lorb3 + lorb4
+                         !klelms = offsetTwo_uv + k + l
 
                          jpos = jOrbSpec%offset*i_nbas
                          do j=0,jOrbSpec%irange
@@ -283,6 +299,11 @@ do l_prim=1,lOrbSystem%n_prim
                             do i=0,iOrbSpec%irange
                                ijpos = ijpos + 1
 
+                               matJ(ijpos,klpos) = prefac*Two%t_val(1)%elms( &
+                                    offsetTwo_uv + i + j + lorb1 + lorb2, &
+                                    klelms)
+
+!                               write(*,*) matJ(ijpos,klpos), i+1, j+1, k+1, l+1
 !                               matJ(ijpos,klpos) = Two%elms( &
 !                                    offsetTwo_uv + i + j, &
 !                                    klelms)
@@ -303,13 +324,19 @@ do l_prim=1,lOrbSystem%n_prim
                       do k=0,kOrbSpec%irange
                          klpos = klpos + 1
 
-                         klelms = offsetTwo_uv + k + l
+                         klelms = offsetTwo_uv + k + l + lorb3 + lorb4
+                         !klelms = offsetTwo_uv + k + l
 
                          jpos = jOrbSpec%offset*i_nbas
                          do j=0,jOrbSpec%irange
                             ijpos = jpos + iOrbSpec%offset
                             do i=0,iOrbSpec%irange
                                ijpos = ijpos + 1
+
+                               matJ(ijpos,klpos) = prefac*Two%t_val(1)%elms( &
+                                    klelms, &
+                                    offsetTwo_uv + i + j + lorb1 + lorb2)
+!                               write(*,*) matJ(ijpos,klpos), i+1, j+1, k+1, l+1
 
 !                               matJ(ijpos,klpos) = Two%elms( &
 !                                    klelms, &
@@ -335,16 +362,18 @@ enddo
 
 end subroutine SCFint_matJ
 
-subroutine SCFint_matK(matK,iOrbSystem,jOrbSystem,kOrbSystem,lOrbSystem)
+subroutine SCFint_matK(matK,iOrbSystem,jOrbSystem,kOrbSystem,lOrbSystem,prefac)
 use misc, only : swap
 implicit none
 real(prec) :: matK(:,:)
+real(prec) :: prefac
 type(OrbSystemData),intent(in) :: iOrbSystem,jOrbSystem,kOrbSystem,lOrbSystem
 integer :: i_prim,j_prim,k_prim,l_prim
 integer :: iexp,jexp,kexp,lexp,ikmin,ikmax,jlmin,jlmax,ikexp,jlexp
 logical :: ikjlorder
 integer :: i_nbas,k_nbas
 integer :: i,j,k,l,ijpos,jpos,klpos,lpos,jlelms
+integer :: lorb1,lorb2,lorb3,lorb4
 
 i_nbas = iOrbSystem%nbas
 k_nbas = kOrbSystem%nbas
@@ -358,6 +387,11 @@ do l_prim=1,lOrbSystem%n_prim
                  jOrbSpec => jOrbSystem%OrbSpec(j_prim), &
                  kOrbSpec => kOrbSystem%OrbSpec(k_prim), &
                  lOrbSpec => lOrbSystem%OrbSpec(l_prim))
+
+              lorb1 = iOrbSystem%lorb
+              lorb2 = jOrbSystem%lorb
+              lorb3 = kOrbSystem%lorb
+              lorb4 = lOrbSystem%lorb
 
               iexp = iOrbSpec%iexp
               jexp = jOrbSpec%iexp
@@ -403,10 +437,17 @@ do l_prim=1,lOrbSystem%n_prim
                          jpos = jOrbSpec%offset*i_nbas
                          do j=0,jOrbSpec%irange
                             ijpos = jpos + iOrbSpec%offset
-                            jlelms = offsetTwo_uv + j + l
+                            jlelms = offsetTwo_uv + j + lorb2 + l + lorb4
+                            !jlelms = offsetTwo_uv + j + l
                             do i=0,iOrbSpec%irange
                                ijpos = ijpos + 1
 
+                               matK(ijpos,klpos) = prefac*Two%t_val(1)%elms( &
+                                    offsetTwo_uv + i + k + lorb1 + lorb3, &
+                                    jlelms)
+
+
+                               write(*,*) matK(ijpos,klpos), i+1,j+1,k+1,l+1
 !                               matK(ijpos,klpos) = Two%elms( &
 !                                    offsetTwo_uv + i + k, &
 !                                    jlelms)
@@ -430,10 +471,15 @@ do l_prim=1,lOrbSystem%n_prim
                          jpos = jOrbSpec%offset*i_nbas
                          do j=0,jOrbSpec%irange
                             ijpos = jpos + iOrbSpec%offset
-                            jlelms = offsetTwo_uv + j + l
+                            jlelms = offsetTwo_uv + j + lorb2 + l + lorb4
                             do i=0,iOrbSpec%irange
                                ijpos = ijpos + 1
 
+                               matK(ijpos,klpos) = Two%t_val(1)%elms( &
+                                    jlelms, &
+                                    offsetTwo_uv + i + k + lorb1 + lorb3)
+                                  
+                               !write(*,*) matK(ijpos,klpos), i+1,j+1,k+1,l+1
 !                               matK(ijpos,klpos) = Two%elms( &
 !                                    jlelms, &
 !                                    offsetTwo_uv + i + k)

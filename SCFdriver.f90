@@ -28,10 +28,11 @@ end type Problem_l_Data
 
 type Problem_ll_Data
 real(prec), allocatable :: J(:,:)
+real(prec), allocatable :: K(:,:)
 end type Problem_ll_Data
 
 type(Problem_l_Data),allocatable :: problem_l(:)
-type(Problem_ll_Data),allocatable :: problem_ll(:)
+type(Problem_ll_Data),allocatable :: problem_ll(:,:)
 
 contains
 
@@ -168,6 +169,7 @@ real(prec) :: energy
 real(prec),allocatable :: matH(:,:),matS(:,:),twoel(:,:)
 real(prec),allocatable :: eval(:),evec(:,:)
 real(prec),allocatable :: matF(:,:),matG(:,:),dens(:,:)
+real(prec) :: prefac
 integer :: i, j, k
 integer :: i1,j1,i2,j2,ij2
 
@@ -182,10 +184,18 @@ do i=1,maxl+1
 enddo
 
 allocate(problem_l(maxl+1))
+allocate(problem_ll(maxl+1,maxl+1))
 do i=1,maxl+1
    call mem_alloc(problem_l(i)%H,nbas(i),nbas(i))
    call mem_alloc(problem_l(i)%S,nbas(i),nbas(i))
 ! add twoel!
+enddo
+
+do i=1,maxl+1
+   do j=1,maxl+1
+      call mem_alloc(problem_ll(i,j)%J,nbas(i)**2,nbas(j)**2)
+      call mem_alloc(problem_ll(i,j)%K,nbas(i)**2,nbas(j)**2)
+   enddo
 enddo
 
 ! hapka: old_drake
@@ -199,20 +209,46 @@ do i=1,maxl+1
   associate(&
        matH => problem_l(i)%H, &
        matS => problem_l(i)%S, &
-       OrbSystem => OrbSystem_L(i)%OrbSystem(1), &
-       lorb1 => OrbSystem_L(i)%lorb, &
-       lorb2 => OrbSystem_L(i)%lorb )
+       OrbSystem => OrbSystem_L(i)%OrbSystem(1) )
 
-      call SCFint_matS(matS,OrbSystem,OrbSystem,lorb1,lorb2)
-      call SCFint_matH(matH,OrbSystem,OrbSystem,nucZ,lorb1,lorb2)
+       call SCFint_matS(matS,OrbSystem,OrbSystem)
+       call SCFint_matH(matH,OrbSystem,OrbSystem,nucZ)
+
+!       do j=1,nbas(i)
+!          write(*,*) matH(j,j)
+!       enddo
+!       write(*,*) ''
 
   end associate
 enddo
-
   
-
+! hapka: old_drake
 !call SCFint_matH(matH,OrbSystem,OrbSystem,nucZ)
 !call SCFint_matS(matS,OrbSystem,OrbSystem)
+
+do i=0,0 !maxl
+   do j=0,0 !maxl
+   associate(&
+      matJ => problem_ll(i+1,j+1)%J, &
+      matK => problem_ll(i+1,j+1)%K, &
+      ijOrbSystem => OrbSystem_L(i+1)%OrbSystem(1), &
+      klOrbSystem => OrbSystem_L(j+1)%OrbSystem(1) )
+ 
+      prefac = 0.5_prec*(2._prec*j+1._prec)
+      !call SCFint_matJ(matJ,ijOrbSystem,ijOrbSystem, &
+      !              &  klOrbSystem,klOrbSystem,prefac)
+
+      ! write(*,*) matJ(1,1)
+
+      !call SCFint_matK(matK,ijOrbSystem,ijOrbSystem, &
+      !              &  klOrbSystem,klOrbSystem,prefac)
+
+      !write(*,*) matK(1,1)
+
+   end associate
+   enddo
+enddo
+
 !call SCFint_matJ(twoel,OrbSystem,OrbSystem,OrbSystem,OrbSystem)
 
 call free_SCFint
@@ -281,8 +317,16 @@ do i=1,maxl+1
    call mem_dealloc(problem_l(i)%S)
 enddo
 
+do i=1,maxl+1
+   do j=1,maxl+1
+      call mem_dealloc(problem_ll(i,j)%J)
+      call mem_dealloc(problem_ll(i,j)%K)
+   enddo
+enddo
+
 
 deallocate(problem_l)
+deallocate(problem_ll)
 deallocate(nbas)
 
 end subroutine SCF_energy_common
@@ -327,21 +371,21 @@ call mem_alloc(matS12,nbas1,nbas2)
 call mem_alloc(matJ12,nbas1**2,nbas2**2)
 call mem_alloc(matK12,nbas1**2,nbas2**2)
 
-call create_SCFint(Nexp,exponents,OrbReduced,LPRINT_mod)
-
-call SCFint_matH(matH1,OrbSystem(1),OrbSystem(1),nucZ)
-call SCFint_matS(matS1,OrbSystem(1),OrbSystem(1))
-call SCFint_matJ(matJ1,OrbSystem(1),OrbSystem(1),OrbSystem(1),OrbSystem(1))
-
-call SCFint_matH(matH2,OrbSystem(2),OrbSystem(2),nucZ)
-call SCFint_matS(matS2,OrbSystem(2),OrbSystem(2))
-call SCFint_matJ(matJ2,OrbSystem(2),OrbSystem(2),OrbSystem(2),OrbSystem(2))
-
-call SCFint_matS(matS12,OrbSystem(1),OrbSystem(2))
-call SCFint_matJ(matJ12,OrbSystem(1),OrbSystem(1),OrbSystem(2),OrbSystem(2))
-call SCFint_matK(matK12,OrbSystem(1),OrbSystem(1),OrbSystem(2),OrbSystem(2))
-
-call free_SCFint
+! call create_SCFint(Nexp,exponents,OrbReduced,LPRINT_mod)
+! 
+! call SCFint_matH(matH1,OrbSystem(1),OrbSystem(1),nucZ)
+! call SCFint_matS(matS1,OrbSystem(1),OrbSystem(1))
+! call SCFint_matJ(matJ1,OrbSystem(1),OrbSystem(1),OrbSystem(1),OrbSystem(1))
+! 
+! call SCFint_matH(matH2,OrbSystem(2),OrbSystem(2),nucZ)
+! call SCFint_matS(matS2,OrbSystem(2),OrbSystem(2))
+! call SCFint_matJ(matJ2,OrbSystem(2),OrbSystem(2),OrbSystem(2),OrbSystem(2))
+! 
+! call SCFint_matS(matS12,OrbSystem(1),OrbSystem(2))
+! call SCFint_matJ(matJ12,OrbSystem(1),OrbSystem(1),OrbSystem(2),OrbSystem(2))
+! call SCFint_matK(matK12,OrbSystem(1),OrbSystem(1),OrbSystem(2),OrbSystem(2))
+! 
+! call free_SCFint
 
 call mem_alloc(vector1,nbas1)
 call mem_alloc(eval1,nbas1)
@@ -589,7 +633,7 @@ if(associated(RESULT_extend)) then
    call mem_alloc(twoel,nbas_max**2,nbas_max**2)
    call create_SCFint(Nexp,exponents,OrbReduced,0)
 
-   call SCFint_matJ(twoel,OrbSystem(1),OrbSystem(1),OrbSystem(1),OrbSystem(1))
+!   call SCFint_matJ(twoel,OrbSystem(1),OrbSystem(1),OrbSystem(1),OrbSystem(1))
    energy = make_contract(&
         nbas1,RESULT_extend%orb_vector(:,1),&
         nbas1,RESULT_extend%orb_vector(:,1),&
@@ -598,7 +642,7 @@ if(associated(RESULT_extend)) then
         twoel,dens)
    RESULT_extend%pair_energy(1,1,1) = energy
 
-   call SCFint_matJ(twoel,OrbSystem(1),OrbSystem(1),OrbSystem(1),OrbSystem(2))
+!   call SCFint_matJ(twoel,OrbSystem(1),OrbSystem(1),OrbSystem(1),OrbSystem(2))
    energy = make_contract(&
         nbas1,RESULT_extend%orb_vector(:,1),&
         nbas1,RESULT_extend%orb_vector(:,1),&
@@ -609,7 +653,7 @@ if(associated(RESULT_extend)) then
    RESULT_extend%pair_energy(1,2,1) = energy
    RESULT_extend%pair_energy(1,1,2) = energy
 
-   call SCFint_matJ(twoel,OrbSystem(1),OrbSystem(2),OrbSystem(1),OrbSystem(2))
+!   call SCFint_matJ(twoel,OrbSystem(1),OrbSystem(2),OrbSystem(1),OrbSystem(2))
    energy = make_contract(&
         nbas1,RESULT_extend%orb_vector(:,1),&
         nbas2,RESULT_extend%orb_vector(:,2),&
@@ -620,7 +664,7 @@ if(associated(RESULT_extend)) then
    RESULT_extend%pair_energy(2,1,2) = energy
    RESULT_extend%pair_energy(1,1,3) = energy
 
-   call SCFint_matJ(twoel,OrbSystem(1),OrbSystem(1),OrbSystem(2),OrbSystem(2))
+!   call SCFint_matJ(twoel,OrbSystem(1),OrbSystem(1),OrbSystem(2),OrbSystem(2))
    energy = make_contract(&
         nbas1,RESULT_extend%orb_vector(:,1),&
         nbas1,RESULT_extend%orb_vector(:,1),&
@@ -629,7 +673,7 @@ if(associated(RESULT_extend)) then
         twoel,dens)
    RESULT_extend%pair_energy(1,2,2) = energy
 
-   call SCFint_matJ(twoel,OrbSystem(1),OrbSystem(2),OrbSystem(2),OrbSystem(2))
+!   call SCFint_matJ(twoel,OrbSystem(1),OrbSystem(2),OrbSystem(2),OrbSystem(2))
    energy = make_contract(&
         nbas1,RESULT_extend%orb_vector(:,1),&
         nbas2,RESULT_extend%orb_vector(:,2),&
@@ -640,7 +684,7 @@ if(associated(RESULT_extend)) then
    RESULT_extend%pair_energy(2,1,3) = energy
    RESULT_extend%pair_energy(1,2,3) = energy
 
-   call SCFint_matJ(twoel,OrbSystem(2),OrbSystem(2),OrbSystem(2),OrbSystem(2))
+!   call SCFint_matJ(twoel,OrbSystem(2),OrbSystem(2),OrbSystem(2),OrbSystem(2))
    energy = make_contract(&
         nbas2,RESULT_extend%orb_vector(:,2),&
         nbas2,RESULT_extend%orb_vector(:,2),&

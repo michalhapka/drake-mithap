@@ -384,7 +384,10 @@ integer :: i,j,k
 
  sumprim_orbs = 0
  do i=1,System%maxl+1
+
    System%OrbSystem_L(i)%lorb = Input%OrbInput_L(i)%lorb 
+   associate(lorb => System%OrbSystem_L(i)%lorb) 
+
     do j=1,System%n_orbs(i)
        associate(OrbInput => Input%OrbInput_L(i)%OrbInput(j), &
             OrbSystem => System%OrbSystem_L(i)%OrbSystem(j))
@@ -409,15 +412,18 @@ integer :: i,j,k
             stop
          endif
     
-         call create_OrbSystem(OrbSystem,nprim_orbs,prim)
+         call create_OrbSystem(OrbSystem,nprim_orbs,prim,lorb)
     
          prim_all(1:2,sumprim_orbs+1:sumprim_orbs+nprim_orbs) = &
               prim(:,1:nprim_orbs)
          prim_all(3,sumprim_orbs+1:sumprim_orbs+nprim_orbs) = & 
               System%OrbSystem_L(i)%lorb 
          sumprim_orbs = sumprim_orbs + nprim_orbs
+
        end associate
     enddo
+
+    end associate
  enddo
  
 ! hapka: old_drake
@@ -700,15 +706,17 @@ enddo
 
 end subroutine reduce_prim_l
 
-subroutine create_OrbSystem(OrbSystem,n,prim)
+subroutine create_OrbSystem(OrbSystem,n,prim,lorb)
 implicit none
 type(OrbSystemData) :: OrbSystem
 integer,intent(in) :: n
 integer,intent(in) :: prim(:,:)
+integer,intent(in) :: lorb
 integer :: offset
 integer :: i
 
 OrbSystem%n_prim = n
+OrbSystem%lorb   = lorb
 
 allocate(OrbSystem%OrbSpec(OrbSystem%n_prim))
 

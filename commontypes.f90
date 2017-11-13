@@ -132,6 +132,7 @@ end type OrbSpecData
 type OrbSystemData
 integer :: nbas
 integer :: n_prim
+integer :: lorb
 type(OrbSpecData),allocatable :: OrbSpec(:)
 end type OrbSystemData
 
