@@ -1624,9 +1624,11 @@ enddo
             write(LOUT,'(i3,4x)',advance='no') OrbReduced%iexp
             idx1=1
             do j=1,System%maxl+1
+!               write(*,*) 'j-1', j-1, 'idx1: ', idx1
+!               write(*,*) ""
                if((j-1).eq.OrbReduced%lang(idx1)) then
                    write(LOUT,'(i3,9x)',advance='no') OrbReduced%max_lrange(idx1)
-                   idx1 = idx1 + 1
+                   if(size(OrbReduced%lang).gt.1) idx1 = idx1 + 1
                else
                    write(LOUT,'(a,4x)',advance='no') 'NOT USED'
                endif

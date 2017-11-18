@@ -805,6 +805,7 @@ do i=1,cnt
    enddo
 
  OrbReduced%nlang = nlang
+ 
  allocate(OrbReduced%lang(nlang),OrbReduced%max_lrange(nlang))
 
 ! fill lang and max_lrange for every iexp 

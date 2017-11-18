@@ -3,8 +3,8 @@ CXX      = g++
 FFLAG    = -Iother/qdlib/include/qd
 LFLAG    = -Lother/qdlib/lib -lqd_f_main -lqdmod -lqd \
            -lgfortran -lquadmath 
-#OPTIONS  = -fcheck=all -Wall -Wextra -Warray-temporaries -Wrealloc-lhs-all -pedantic -std=f2008
-OPTIONS = -O3
+OPTIONS  = -fcheck=all -Wall -Wextra -Warray-temporaries -Wrealloc-lhs-all -pedantic -std=f2008
+#OPTIONS = -O3
 
 NAME = drake
 OBJ  = file_INOUT.o precision.o precision_qd.o misc.o memory.o time.o \
