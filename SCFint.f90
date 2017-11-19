@@ -8,8 +8,6 @@ implicit none
 
 private
 public create_SCFint,free_SCFint
-public create_I_Lambda,free_I_Lambda
-public print_I_Lambda
 public SCFint_matH,SCFint_matS,SCFint_matJ,SCFint_matK
 
 integer,parameter :: smallestOne = -1
@@ -45,7 +43,6 @@ real(prec) :: ijalpha,klalpha
 integer :: ijrange,klrange
 !real(prec),allocatable :: elms(:,:)
 type(TwoInt_t_Data),allocatable :: t_val(:) 
-type(TwoInt_t_Data),allocatable :: lam_val(:) 
 end type TwoIntData
 
 type(OneIntData),allocatable :: OneInt(:)
@@ -67,6 +64,9 @@ call print_OneInt(LPRINT)
  call init_TwoInt(Nexp)
  call create_TwoInt(Nexp,exponents,OrbReduced)
  call print_TwoInt(LPRINT)
+ 
+ call create_I_Lambda(Nexp)
+ call print_I_Lambda(LPRINT)
 
 end subroutine create_SCFint
 
@@ -308,7 +308,7 @@ do l_prim=1,lOrbSystem%n_prim
                                     offsetTwo_uv + i + j + lorb1 + lorb2, &
                                     klelms)
 
-!                               write(*,*) matJ(ijpos,klpos), i+1, j+1, k+1, l+1
+                               write(*,*) matJ(ijpos,klpos), i+1, j+1, k+1, l+1
 !                               matJ(ijpos,klpos) = Two%elms( &
 !                                    offsetTwo_uv + i + j, &
 !                                    klelms)
@@ -341,7 +341,7 @@ do l_prim=1,lOrbSystem%n_prim
                                matJ(ijpos,klpos) = prefac*Two%t_val(1)%elms( &
                                     klelms, &
                                     offsetTwo_uv + i + j + lorb1 + lorb2)
-!                               write(*,*) matJ(ijpos,klpos), i+1, j+1, k+1, l+1
+                               write(*,*) matJ(ijpos,klpos), i+1, j+1, k+1, l+1
 
 !                               matJ(ijpos,klpos) = Two%elms( &
 !                                    klelms, &
@@ -599,26 +599,6 @@ deallocate(TwoInt)
 
 end subroutine free_TwoInt
 
-subroutine free_I_Lambda
-implicit none
-integer :: iTwo, j
-
-do iTwo=1,size(TwoInt)
-   associate(Two => TwoInt(iTwo))
-
-      if(Two%isUsed.and.(size(Two%t_val).gt.1)) then
-        
-         do j=1,size(Two%lam_val)
-            call mem_dealloc(Two%lam_val(j)%elms)
-         enddo
-
-         deallocate(Two%lam_val)
-      endif
-
-   end associate
-enddo
-
-end subroutine free_I_Lambda
 
 subroutine choose_maxrange(iOrbSpec,jOrbSpec,maxrange,doint)
 implicit none
@@ -1049,17 +1029,19 @@ endif
 
 end subroutine create_TwoInt
 
-subroutine create_I_Lambda(Nexp,LPRINT)
+subroutine create_I_Lambda(Nexp)
 implicit none
 integer,intent(in) :: Nexp
-integer,intent(in) :: LPRINT
 real(prec) :: lam_tmp, c_tmp, prefac
 integer :: offset_I_uv
 integer :: subsizeTwo, sizeTwo
 integer :: lam_range
 integer :: span, start_uv, pos 
 integer :: iTwo, ival, jval
+integer :: offset_uv, last_ij, last_kl
+integer :: ijOff, klOff
 integer :: i, j, k
+integer,dimension(2) :: last
 
 subsizeTwo = Nexp*(Nexp+1)/2
 sizeTwo=(subsizeTwo*(subsizeTwo+1)/2)
@@ -1080,10 +1062,6 @@ do iTwo=1,sizeTwo
            ! create I_1
            do j=smallest_I1_uv,Two%klrange
               do i=smallest_I1_uv,Two%ijrange
-
-!          write(LOUT,'(4i3,2(f18.8,i5))') &
-!                Two%iexp,Two%jexp,Two%kexp,Two%lexp,&
-!                Two%ijalpha,Two%ijrange,Two%klalpha,Two%klrange
 
                  Two%t_val(span+2-ival)%elms(offset_I1_uv+i,offset_I1_uv+j)= 0.5_prec* ( &
                  Two%t_val(span+1-ival)%elms(offsetTwo_uv+i+1,offsetTwo_uv+j-1) + &
@@ -1124,48 +1102,39 @@ do iTwo=1,sizeTwo
 
         enddo
 
- ! hapka: old_I1
- !       lam_range = size(Two%t_val) - 1
- !      
- !       ! skip when max4l==0 
- !       if(lam_range.eq.0) cycle
-
- !          allocate(Two%lam_val(lam_range))
- !
- !          do i=1,lam_range
- !             associate( lamval => Two%lam_val(i) )
- !             lamval%two_t = i
- !             call mem_alloc(lamval%elms, &
- !                            Two%ijrange-smallestTwo_uv+1-i,&
- !                            Two%klrange-smallestTwo_uv+1-i)
- !             end associate
- !          enddo
-
- !        ! get I_1 only when necessary 
- !        if(Two%t_val(1)%shift.eq.1) then
- !  
- !  !        write(LOUT,'(4i3,2(f18.8,i5))') &
- !  !              Two%iexp,Two%jexp,Two%kexp,Two%lexp,&
- !  !              Two%ijalpha,Two%ijrange,Two%klalpha,Two%klrange
- !  
- !           do j=smallest_I1_uv,Two%klrange
- !              do i=smallest_I1_uv,Two%ijrange
- !
- !                 Two%lam_val(1)%elms(offset_I1_uv+i,offset_I1_uv+j) = 0.5_prec *( &
- !                     Two%t_val(1)%elms(offsetTwo_uv+i+1,offsetTwo_uv+j-1) + &
- !                     Two%t_val(1)%elms(offsetTwo_uv+i-1,offsetTwo_uv+j+1) - &
- !                     Two%t_val(2)%elms(offsetTwo_uv+i-1,offsetTwo_uv+j-1) )
-
- !              enddo
- !           enddo
- !        endif 
- !  
      endif
    end associate
 
 enddo
 
-call print_I_Lambda
+! fill unused space
+do iTwo=1,sizeTwo
+   associate(Two => TwoInt(iTwo))
+      if(Two%isUsed) then
+            do k=1,size(Two%t_val)
+               associate(tval => Two%t_val(k))
+
+               offset_uv = -tval%lambda+1
+               ijOff = Two%ijrange+offset_uv
+               klOff = Two%klrange+offset_uv
+               last    = shape(tval%elms) 
+               last_ij = last(1)
+               last_kl = last(2)
+
+               if((ijOff.ne.last_ij).and.(klOff.ne.last_kl)) then
+                  do i=1,last_kl
+                     tval%elms(last_ij,i) = huge(0._prec)
+                  enddo
+                  do j=1,last_ij
+                     tval%elms(j,last_kl) = huge(0._prec)
+                  enddo
+               endif 
+
+               end associate
+            enddo
+      endif
+   end associate
+enddo
 
 end subroutine create_I_Lambda
 
@@ -1249,14 +1218,14 @@ endif
 
 end subroutine print_TwoInt
 
-subroutine print_I_Lambda!(LPRINT)
+subroutine print_I_Lambda(LPRINT)
 implicit none
-!integer, intent(in) :: LPRINT
+integer, intent(in) :: LPRINT
 integer :: iTwo
 integer :: start_uv,offset_uv
 integer :: i,j,k
 
-!if(LPRINT>=10) then
+if(LPRINT>=10) then
 
    write(LOUT,'()')
    write(LOUT,'(5x,a)') '--- SCF I_Lambda integrals ---'
@@ -1272,58 +1241,36 @@ integer :: i,j,k
             write(LOUT,'(4i3,2(f18.8,i5))') &
                  Two%iexp,Two%jexp,Two%kexp,Two%lexp,&
                  Two%ijalpha,Two%ijrange,Two%klalpha,Two%klrange
-            do k=1,size(Two%t_val)
-               associate(tval => Two%t_val(k))
-               write(*,'(5x,a,i3,3x,a,i3)') 'LAMBDA: ', tval%lambda, 'c: ', tval%two_t
-               start_uv = tval%lambda
-               offset_uv = -tval%lambda+1
-               !if(tval%lambda.eq.2) then
-                  do j=start_uv,Two%klrange
-                     do i=start_uv,Two%ijrange
-                          write(LOUT,'(10x,4i3,a,es45.33)') i, j, tval%lambda, tval%two_t,' : ',&
-                                tval%elms(offset_uv + i,offset_uv + j)
-                     enddo
-                  enddo
-               !endif
-               end associate
-            enddo           
-
+           if(LPRINT>=100) then
+              do k=1,size(Two%t_val)
+                 associate(tval => Two%t_val(k))
+!                 write(*,*) 'SIZE: ', size(tval%elms)
+                 write(*,'(18x,a,2x,a)') 'L', 'c :'
+                 start_uv = tval%lambda
+                 offset_uv = -tval%lambda+1
+                 !if(tval%lambda.eq.2) then
+                    do j=start_uv,Two%klrange
+                       do i=start_uv,Two%ijrange
+                            write(LOUT,'(10x,4i3,a,es45.33)') i, j, tval%lambda, tval%two_t,' : ',&
+                                  tval%elms(offset_uv + i,offset_uv + j)
+                       enddo
+                    enddo
+                 !endif
+                 !write(*,*) 'TEST: ', Two%ijrange+offset_uv,Two%klrange+offset_uv
+                 !write(*,*) 'LAST: ', tval%elms(Two%ijrange+offset_uv,Two%klrange+offset_uv)
+                 !write(*,*) 'RANGE:', shape(tval%elms(:,1)), shape(tval%elms(1,:)) 
+                 !write(*,*) 'LAST: ', tval%elms(shape(tval%elms(:,1)),shape(tval%elms(1,:))) 
+                 end associate
+              enddo           
+           endif
          else
-            write(LOUT,'(a)') 'NOT USED'! ,Two%iexp,Two%jexp,Two%kexp,Two%lexp
+            write(LOUT,'(a)') 'NOT USED'
          endif
       end associate
 
    enddo
 
- !   do iTwo=1,size(TwoInt)
- !      associate(Two => TwoInt(iTwo))
- !        write(LOUT,'(5x,i3,a)',advance='no') iTwo,' : '
- !        if(Two%isUsed.and.(size(Two%t_val).gt.1)) then
- !           write(LOUT,'(4i3,2(f18.8,i5))') &
- !                Two%iexp,Two%jexp,Two%kexp,Two%lexp,&
- !                Two%ijalpha,Two%ijrange,Two%klalpha,Two%klrange
- !!           if(LPRINT>=100) then
- !              do k=1,1!size(Two%lam_val)
- !                 associate(lamval => Two%lam_val(k))
- !
- !!                 write(*,*) size(lamval%elms)  
- !                 do j=smallest_I1_uv,Two%klrange
- !                    do i=smallest_I1_uv,Two%ijrange
- !                       write(LOUT,'(10x,3i3,a,es45.33)') i, j, lamval%two_t,' : ',&
- !                            lamval%elms(offset_I1_uv + i,offset_I1_uv + j)
- !                    enddo
- !                 enddo
- !                 end associate
- !              enddo
- !
- !!           endif
- !        else
- !           write(LOUT,'(a)') 'NOT USED'! ,Two%iexp,Two%jexp,Two%kexp,Two%lexp
- !        endif
- !      end associate
- !   enddo
-
-!endif
+endif
 
 end subroutine print_I_Lambda
 

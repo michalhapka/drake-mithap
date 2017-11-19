@@ -204,8 +204,6 @@ enddo
 !call mem_alloc(twoel,nbas**2,nbas**2)
 
 call create_SCFint(Nexp,exponents,OrbReduced,LPRINT_mod)
-call create_I_Lambda(Nexp,LPRINT_mod)
-!call print_I_Lambda
 
 do i=1,maxl+1
   associate(&
@@ -236,14 +234,14 @@ do i=0,0 !maxl
       ijOrbSystem => OrbSystem_L(i+1)%OrbSystem(1), &
       klOrbSystem => OrbSystem_L(j+1)%OrbSystem(1) )
  
-!      prefac = 0.5_prec*(2._prec*j+1._prec)
+      prefac = 0.5_prec*(2._prec*j+1._prec)
 !      call SCFint_matJ(matJ,ijOrbSystem,ijOrbSystem, &
 !                    &  klOrbSystem,klOrbSystem,prefac)
 
-      ! write(*,*) matJ(1,1)
+!       write(*,*) matJ(1,1)
 
-      !call SCFint_matK(matK,ijOrbSystem,ijOrbSystem, &
-      !              &  klOrbSystem,klOrbSystem,prefac)
+!      call SCFint_matK(matK,ijOrbSystem,ijOrbSystem, &
+!                    &  klOrbSystem,klOrbSystem,prefac)
 
       !write(*,*) matK(1,1)
 
@@ -253,7 +251,6 @@ enddo
 
 !call SCFint_matJ(twoel,OrbSystem,OrbSystem,OrbSystem,OrbSystem)
 
-!call free_I_Lambda
 call free_SCFint
 
 !call mem_alloc(eval,nbas)
