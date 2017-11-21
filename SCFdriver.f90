@@ -31,8 +31,16 @@ real(prec), allocatable :: J(:,:)
 real(prec), allocatable :: K(:,:)
 end type Problem_ll_Data
 
+type RefLamData
+integer :: nlambda
+integer,allocatable :: lambda(:)
+real(prec),allocatable :: prefac(:)
+end type RefLamData
+
 type(Problem_l_Data),allocatable :: problem_l(:)
 type(Problem_ll_Data),allocatable :: problem_ll(:,:)
+
+type(RefLamData),allocatable :: refJ(:,:), refK(:,:)
 
 contains
 
@@ -170,6 +178,7 @@ real(prec),allocatable :: matH(:,:),matS(:,:),twoel(:,:)
 real(prec),allocatable :: eval(:),evec(:,:)
 real(prec),allocatable :: matF(:,:),matG(:,:),dens(:,:)
 real(prec) :: prefac
+integer :: lambda
 integer :: i, j, k
 integer :: i1,j1,i2,j2,ij2
 
@@ -204,6 +213,7 @@ enddo
 !call mem_alloc(twoel,nbas**2,nbas**2)
 
 call create_SCFint(Nexp,exponents,OrbReduced,LPRINT_mod)
+call create_refJK(maxl)
 
 do i=1,maxl+1
   associate(&
@@ -226,24 +236,31 @@ enddo
 !call SCFint_matH(matH,OrbSystem,OrbSystem,nucZ)
 !call SCFint_matS(matS,OrbSystem,OrbSystem)
 
-do i=0,0 !maxl
-   do j=0,0 !maxl
+do i=0,maxl
+   do j=0,maxl
    associate(&
+      refJ => refJ(i+1,j+1), &
+      refK => refK(i+1,j+1), &
       matJ => problem_ll(i+1,j+1)%J, &
       matK => problem_ll(i+1,j+1)%K, &
       ijOrbSystem => OrbSystem_L(i+1)%OrbSystem(1), &
-      klOrbSystem => OrbSystem_L(j+1)%OrbSystem(1) )
+      klOrbSystem => OrbSystem_L(j+1)%OrbSystem(1)  )
  
-      prefac = 0.5_prec*(2._prec*j+1._prec)
-!      call SCFint_matJ(matJ,ijOrbSystem,ijOrbSystem, &
-!                    &  klOrbSystem,klOrbSystem,prefac)
+      matJ = 0._prec
+      do k=1,refJ%nlambda 
+         prefac = refJ%prefac(k)
+         lambda = refJ%lambda(k)
+         call SCFint_matJ(matJ,ijOrbSystem,ijOrbSystem, &
+                       &  klOrbSystem,klOrbSystem,lambda,prefac)
+      enddo
 
-!       write(*,*) matJ(1,1)
-
-!      call SCFint_matK(matK,ijOrbSystem,ijOrbSystem, &
-!                    &  klOrbSystem,klOrbSystem,prefac)
-
-      !write(*,*) matK(1,1)
+      matK = 0._prec
+      do k=1,refK%nlambda
+         prefac = refK%prefac(k)
+         lambda = refK%lambda(k)
+         call SCFint_matK(matK,ijOrbSystem,ijOrbSystem, &
+                    &  klOrbSystem,klOrbSystem,lambda,prefac)
+      enddo
 
    end associate
    enddo
@@ -251,6 +268,7 @@ enddo
 
 !call SCFint_matJ(twoel,OrbSystem,OrbSystem,OrbSystem,OrbSystem)
 
+call free_refJK(maxl)
 call free_SCFint
 
 !call mem_alloc(eval,nbas)
@@ -1078,6 +1096,73 @@ case default
 end select
 
 end subroutine make_matG_2
+
+subroutine create_refJK(maxl)
+! to be adapted to general case later
+implicit none
+integer,intent(in) :: maxl
+integer :: i, j
+real(prec) :: prefac
+
+allocate(refJ(maxl+1,maxl+1), &
+         refK(maxl+1,maxl+1))
+
+do i=1,maxl+1
+   do j=1,maxl+1
+      prefac = 1._prec*j - 0.5_prec
+      associate(refJ => refJ(i,j) )
+      allocate(refJ%lambda(1),refJ%prefac(1))
+      refJ%nlambda = 1
+      refJ%lambda = 0
+      refJ%prefac = prefac
+      end associate
+   enddo
+enddo
+
+do i=1,maxl+1
+   do j=1,maxl+1
+      associate(refK => refK(i,j) )
+      allocate(refK%lambda((i+j)/2), &
+               refK%prefac((i+j)/2) )
+      refK%nlambda = (i+j)/2
+      end associate
+   enddo
+enddo
+
+refK(1,1)%lambda(1) = 0
+refK(1,2)%lambda(1) = 1
+refK(2,1)%lambda(1) = 1
+refK(2,2)%lambda(1) = 0
+refK(2,2)%lambda(2) = 2
+
+refK(1,1)%prefac(1) = 0.5_prec
+refK(1,2)%prefac(1) = 1.5_prec
+refK(2,1)%prefac(1) = 0.5_prec
+refK(2,2)%prefac(1) = 0.5_prec
+refK(2,2)%prefac(2) = 1._prec
+
+!deallocate(refJ,refK)
+
+end subroutine create_refJK
+
+subroutine free_refJK(maxl)
+implicit none
+integer,intent(in) :: maxl
+integer :: i, j
+
+! dellocate refJK
+do i=1,maxl+1
+   do j=1,maxl+1
+      associate(refK => refK(i,j), &
+                refJ => refJ(i,j) )
+      deallocate(refK%lambda, refK%prefac, &
+                 refJ%lambda, refJ%prefac )
+      end associate
+   enddo
+enddo
+deallocate(refJ,refK)
+
+end subroutine free_refJK
 
 subroutine make_over(nbas1,nbas2,p,dimtype,matS,vec)
 implicit none

@@ -16,7 +16,6 @@ integer,parameter :: offsetOne   = 1 - smallestOne
 integer,parameter :: smallestTwo_uv = 0
 integer,parameter :: smallest_I1_uv = 1
 integer,parameter :: offsetTwo_uv   = 1 - smallestTwo_uv
-integer,parameter :: offset_I1_uv   = 1 - smallest_I1_uv
 !integer,parameter :: onlyTwo_t      = -1
 integer,parameter :: smallestTwo_t      = -1
 
@@ -222,18 +221,19 @@ enddo
 
 end subroutine SCFint_matS
 
-subroutine SCFint_matJ(matJ,iOrbSystem,jOrbSystem,kOrbSystem,lOrbSystem,prefac)
+subroutine SCFint_matJ(matJ,iOrbSystem,jOrbSystem,kOrbSystem,lOrbSystem,lambda,prefac)
 use misc, only : swap
 implicit none
 real(prec) :: matJ(:,:)
 real(prec),intent(in) :: prefac
+integer,intent(in) :: lambda
 type(OrbSystemData),intent(in) :: iOrbSystem,jOrbSystem,kOrbSystem,lOrbSystem
 integer :: i_prim,j_prim,k_prim,l_prim
 integer :: iexp,jexp,kexp,lexp,ijmin,ijmax,klmin,klmax,ijexp,klexp
 logical :: ijklorder
 integer :: i_nbas,k_nbas
 integer :: i,j,k,l,ijpos,jpos,klpos,lpos,klelms
-integer :: lorb1,lorb2,lorb3,lorb4
+integer :: iOrbl,jOrbl,kOrbl,lOrbl
 
 i_nbas = iOrbSystem%nbas
 k_nbas = kOrbSystem%nbas
@@ -248,10 +248,10 @@ do l_prim=1,lOrbSystem%n_prim
                  kOrbSpec => kOrbSystem%OrbSpec(k_prim), &
                  lOrbSpec => lOrbSystem%OrbSpec(l_prim))
 
-              lorb1 = iOrbSystem%lorb
-              lorb2 = jOrbSystem%lorb
-              lorb3 = kOrbSystem%lorb
-              lorb4 = lOrbSystem%lorb
+              iOrbl = iOrbSystem%lorb
+              jOrbl = jOrbSystem%lorb
+              kOrbl = kOrbSystem%lorb
+              lOrbl = lOrbSystem%lorb
 
               iexp = iOrbSpec%iexp
               jexp = jOrbSpec%iexp
@@ -273,8 +273,8 @@ do l_prim=1,lOrbSystem%n_prim
                  call swap(ijexp,klexp)
               endif
 
-              !associate(Two => TwoInt(ijexp + klexp*(klexp-1)/2))
-              associate(Two => TwoInt(ijexp + klexp*(klexp-1)/2))
+              associate(Two => TwoInt(ijexp + klexp*(klexp-1)/2)) 
+               associate(tval => Two%t_val(lambda+1) )
                 if(.not.Two%isUsed) then
                    write(LOUT,'(a)') 'ERROR!!! &
                         &Non-existing entry in SCFint_matJ!'
@@ -295,7 +295,7 @@ do l_prim=1,lOrbSystem%n_prim
                       do k=0,kOrbSpec%irange
                          klpos = klpos + 1
 
-                         klelms = offsetTwo_uv + k + l + lorb3 + lorb4
+                         klelms = offsetTwo_uv + k + l + kOrbl + lOrbl
                          !klelms = offsetTwo_uv + k + l
 
                          jpos = jOrbSpec%offset*i_nbas
@@ -304,11 +304,12 @@ do l_prim=1,lOrbSystem%n_prim
                             do i=0,iOrbSpec%irange
                                ijpos = ijpos + 1
 
-                               matJ(ijpos,klpos) = prefac*Two%t_val(1)%elms( &
-                                    offsetTwo_uv + i + j + lorb1 + lorb2, &
+                               matJ(ijpos,klpos) = matJ(ijpos,klpos) + &
+                                    prefac*tval%elms( &
+                                    offsetTwo_uv + i + j + iOrbl + jOrbl, &
                                     klelms)
 
-                               write(*,*) matJ(ijpos,klpos), i+1, j+1, k+1, l+1
+!                               write(*,*) matJ(ijpos,klpos), i+1, j+1, k+1, l+1
 !                               matJ(ijpos,klpos) = Two%elms( &
 !                                    offsetTwo_uv + i + j, &
 !                                    klelms)
@@ -329,7 +330,7 @@ do l_prim=1,lOrbSystem%n_prim
                       do k=0,kOrbSpec%irange
                          klpos = klpos + 1
 
-                         klelms = offsetTwo_uv + k + l + lorb3 + lorb4
+                         klelms = offsetTwo_uv + k + l + kOrbl + lOrbl
                          !klelms = offsetTwo_uv + k + l
 
                          jpos = jOrbSpec%offset*i_nbas
@@ -338,11 +339,12 @@ do l_prim=1,lOrbSystem%n_prim
                             do i=0,iOrbSpec%irange
                                ijpos = ijpos + 1
 
-                               matJ(ijpos,klpos) = prefac*Two%t_val(1)%elms( &
+                               matJ(ijpos,klpos) =  matJ(ijpos,klpos) + &
+                                    prefac*tval%elms( &
                                     klelms, &
-                                    offsetTwo_uv + i + j + lorb1 + lorb2)
-                               write(*,*) matJ(ijpos,klpos), i+1, j+1, k+1, l+1
-
+                                    offsetTwo_uv + i + j + iOrbl + jOrbl)
+!                               write(*,*) matJ(ijpos,klpos), i+1, j+1, k+1, l+1
+!
 !                               matJ(ijpos,klpos) = Two%elms( &
 !                                    klelms, &
 !                                    offsetTwo_uv + i + j)
@@ -357,6 +359,7 @@ do l_prim=1,lOrbSystem%n_prim
 
                 endif
 
+               end associate
               end associate
 
             end associate
@@ -367,18 +370,21 @@ enddo
 
 end subroutine SCFint_matJ
 
-subroutine SCFint_matK(matK,iOrbSystem,jOrbSystem,kOrbSystem,lOrbSystem,prefac)
+subroutine SCFint_matK(matK,iOrbSystem,jOrbSystem,kOrbSystem,lOrbSystem,lambda,prefac)
 use misc, only : swap
 implicit none
 real(prec) :: matK(:,:)
-real(prec) :: prefac
+real(prec),intent(in) :: prefac
+integer,intent(in) :: lambda
 type(OrbSystemData),intent(in) :: iOrbSystem,jOrbSystem,kOrbSystem,lOrbSystem
 integer :: i_prim,j_prim,k_prim,l_prim
 integer :: iexp,jexp,kexp,lexp,ikmin,ikmax,jlmin,jlmax,ikexp,jlexp
 logical :: ikjlorder
 integer :: i_nbas,k_nbas
-integer :: i,j,k,l,ijpos,jpos,klpos,lpos,jlelms
-integer :: lorb1,lorb2,lorb3,lorb4
+integer :: i,j,k,l,ijpos,jpos,klpos,lpos,ilelms
+!integer :: jlelms
+integer :: iOrbl,jOrbl,kOrbl,lOrbl
+
 
 i_nbas = iOrbSystem%nbas
 k_nbas = kOrbSystem%nbas
@@ -393,10 +399,10 @@ do l_prim=1,lOrbSystem%n_prim
                  kOrbSpec => kOrbSystem%OrbSpec(k_prim), &
                  lOrbSpec => lOrbSystem%OrbSpec(l_prim))
 
-              lorb1 = iOrbSystem%lorb
-              lorb2 = jOrbSystem%lorb
-              lorb3 = kOrbSystem%lorb
-              lorb4 = lOrbSystem%lorb
+              iOrbl = iOrbSystem%lorb
+              jOrbl = jOrbSystem%lorb
+              kOrbl = kOrbSystem%lorb
+              lOrbl = lOrbSystem%lorb
 
               iexp = iOrbSpec%iexp
               jexp = jOrbSpec%iexp
@@ -419,6 +425,7 @@ do l_prim=1,lOrbSystem%n_prim
               endif
 
               associate(Two => TwoInt(ikexp + jlexp*(jlexp-1)/2))
+               associate(tval => Two%t_val(lambda+1))
                 if(.not.Two%isUsed) then
                    write(LOUT,'(a)') 'ERROR!!! &
                         &Non-existing entry in SCFint_matK!'
@@ -442,17 +449,19 @@ do l_prim=1,lOrbSystem%n_prim
                          jpos = jOrbSpec%offset*i_nbas
                          do j=0,jOrbSpec%irange
                             ijpos = jpos + iOrbSpec%offset
-                            jlelms = offsetTwo_uv + j + lorb2 + l + lorb4
+                            !jlelms = offsetTwo_uv + j + jOrbl + l + lOrbl
                             !jlelms = offsetTwo_uv + j + l
                             do i=0,iOrbSpec%irange
+                               ilelms = offsetTwo_uv + i + iOrbl + l + lOrbl
                                ijpos = ijpos + 1
 
-                               matK(ijpos,klpos) = prefac*Two%t_val(1)%elms( &
-                                    offsetTwo_uv + i + k + lorb1 + lorb3, &
-                                    jlelms)
+                               matK(ijpos,klpos) = matK(ijpos,klpos) + &
+                                    prefac*tval%elms( &
+                                    offsetTwo_uv + j + k + jOrbl + kOrbl, &
+                                    ilelms)
 
 
-                               write(*,*) matK(ijpos,klpos), i+1,j+1,k+1,l+1
+!                               write(*,*) 'O: ', matK(ijpos,klpos), i+1,j+1,k+1,l+1
 !                               matK(ijpos,klpos) = Two%elms( &
 !                                    offsetTwo_uv + i + k, &
 !                                    jlelms)
@@ -476,15 +485,17 @@ do l_prim=1,lOrbSystem%n_prim
                          jpos = jOrbSpec%offset*i_nbas
                          do j=0,jOrbSpec%irange
                             ijpos = jpos + iOrbSpec%offset
-                            jlelms = offsetTwo_uv + j + lorb2 + l + lorb4
+                            !jlelms = offsetTwo_uv + j + jOrbl + l + lOrbl
                             do i=0,iOrbSpec%irange
+                               ilelms = offsetTwo_uv + i + iOrbl + l + lOrbl
                                ijpos = ijpos + 1
 
-                               matK(ijpos,klpos) = Two%t_val(1)%elms( &
-                                    jlelms, &
-                                    offsetTwo_uv + i + k + lorb1 + lorb3)
+                               matK(ijpos,klpos) = matK(ijpos,klpos) + &
+                                    prefac*tval%elms(ilelms, &
+                                   ! ilelms, &
+                                    offsetTwo_uv + j + k + jOrbl + kOrbl)
                                   
-                               !write(*,*) matK(ijpos,klpos), i+1,j+1,k+1,l+1
+!                               write(*,*) 'U:', matK(ijpos,klpos), i+1,j+1,k+1,l+1
 !                               matK(ijpos,klpos) = Two%elms( &
 !                                    jlelms, &
 !                                    offsetTwo_uv + i + k)
@@ -499,6 +510,7 @@ do l_prim=1,lOrbSystem%n_prim
 
                 endif
 
+               end associate
               end associate
 
             end associate
@@ -598,7 +610,6 @@ enddo
 deallocate(TwoInt)
 
 end subroutine free_TwoInt
-
 
 subroutine choose_maxrange(iOrbSpec,jOrbSpec,maxrange,doint)
 implicit none
@@ -865,7 +876,7 @@ do lexp=1,Nexp
                       shift  = 0
                    else
                       shift = 1
-                      shift(max4l/2+1) = -1 
+                      shift(max4l/2+1) = 0 !-1 
                    endif
 !                   write(*,*) shift
 
@@ -1033,7 +1044,6 @@ subroutine create_I_Lambda(Nexp)
 implicit none
 integer,intent(in) :: Nexp
 real(prec) :: lam_tmp, c_tmp, prefac
-integer :: offset_I_uv
 integer :: subsizeTwo, sizeTwo
 integer :: lam_range
 integer :: span, start_uv, pos 
@@ -1060,15 +1070,26 @@ do iTwo=1,sizeTwo
         do ival=1,span
        
            ! create I_1
-           do j=smallest_I1_uv,Two%klrange
-              do i=smallest_I1_uv,Two%ijrange
 
-                 Two%t_val(span+2-ival)%elms(offset_I1_uv+i,offset_I1_uv+j)= 0.5_prec* ( &
+           do j=Two%klrange,smallest_I1_uv,-1
+              do i=Two%ijrange,smallest_I1_uv,-1
+                 Two%t_val(span+2-ival)%elms(offsetTwo_uv+i,offsetTwo_uv+j)= 0.5_prec* ( &
                  Two%t_val(span+1-ival)%elms(offsetTwo_uv+i+1,offsetTwo_uv+j-1) + &
                  Two%t_val(span+1-ival)%elms(offsetTwo_uv+i-1,offsetTwo_uv+j+1) - &
                  Two%t_val(span+2-ival)%elms(offsetTwo_uv+i-1,offsetTwo_uv+j-1) ) 
               enddo
            enddo
+
+  !         do j=smallest_I1_uv,Two%klrange
+  !            do i=smallest_I1_uv,Two%ijrange
+
+  !               Two%t_val(span+2-ival)%elms(i,j)= 0.5_prec* ( &
+  !               Two%t_val(span+1-ival)%elms(offsetTwo_uv+i+1,offsetTwo_uv+j-1) + &
+  !               Two%t_val(span+1-ival)%elms(offsetTwo_uv+i-1,offsetTwo_uv+j+1) - &
+  !               Two%t_val(span+2-ival)%elms(offsetTwo_uv+i-1,offsetTwo_uv+j-1) ) 
+  !            enddo
+  !         enddo
+
         Two%t_val(span+2-ival)%two_t = Two%t_val(span+2-ival)%two_t - 2   
         Two%t_val(span+2-ival)%lambda = 1   
 
@@ -1083,16 +1104,27 @@ do iTwo=1,sizeTwo
            prefac = (2._prec*lam_tmp + 1._prec) / (c_tmp + 2._prec)
 
            start_uv = jval + 1
-           offset_I_uv = -jval
-             do j=start_uv,Two%klrange 
-                do i=start_uv,Two%ijrange 
+             do j=Two%klrange,start_uv,-1 
+                do i=Two%ijrange,start_uv,-1 
 
-                   Two%t_val(span+2-ival+jval)%elms(offset_I_uv+i,offset_I_uv+j) = prefac* ( &
-                   Two%t_val(span+2-ival+jval)%elms(i+pos-1,j+pos-1)) + &
-                   Two%t_val(span-ival+jval)%elms(i+pos+1,j+pos+1) 
+                   Two%t_val(span+2-ival+jval)%elms(offsetTwo_uv+i,offsetTwo_uv+j) = prefac* ( &
+                   Two%t_val(span+2-ival+jval)%elms(offsetTwo_uv+i+pos-1,offsetTwo_uv+j+pos-1)) + &
+                   Two%t_val(span-ival+jval)%elms(offsetTwo_uv+i+pos,offsetTwo_uv+j+pos) 
 
                 enddo
              enddo
+
+! first test
+!           offset_I_uv = -jval
+!             do j=start_uv,Two%klrange 
+!                do i=start_uv,Two%ijrange 
+!
+!                   Two%t_val(span+2-ival+jval)%elms(offset_I_uv+i,offset_I_uv+j) = prefac* ( &
+!                   Two%t_val(span+2-ival+jval)%elms(i+pos-1,j+pos-1)) + &
+!                   Two%t_val(span-ival+jval)%elms(i+pos+1,j+pos+1) 
+!
+!                enddo
+!             enddo
 
            pos = pos - 1
            Two%t_val(span+2-ival+jval)%lambda = Two%t_val(span+2-ival+jval)%lambda + 1
@@ -1113,23 +1145,37 @@ do iTwo=1,sizeTwo
       if(Two%isUsed) then
             do k=1,size(Two%t_val)
                associate(tval => Two%t_val(k))
-
-               offset_uv = -tval%lambda+1
-               ijOff = Two%ijrange+offset_uv
-               klOff = Two%klrange+offset_uv
+               if(tval%lambda.gt.0) then
+!
+!               offset_uv = -tval%lambda+1
+!               ijOff = Two%ijrange+offset_uv
+!               klOff = Two%klrange+offset_uv
                last    = shape(tval%elms) 
                last_ij = last(1)
                last_kl = last(2)
 
-               if((ijOff.ne.last_ij).and.(klOff.ne.last_kl)) then
-                  do i=1,last_kl
-                     tval%elms(last_ij,i) = huge(0._prec)
+               do i=1,tval%lambda
+                  do j=1,last_kl
+                     tval%elms(i,j) = huge(0._prec)
                   enddo
-                  do j=1,last_ij
-                     tval%elms(j,last_kl) = huge(0._prec)
-                  enddo
-               endif 
+               enddo
 
+               do i=1,tval%lambda
+                  do j=1,last_ij
+                     tval%elms(j,i) = huge(0._prec)
+                  enddo
+               enddo
+
+
+!               if((ijOff.ne.last_ij).and.(klOff.ne.last_kl)) then
+!                  do i=1,last_kl
+!                     tval%elms(last_ij,i) = huge(0._prec)
+!                  enddo
+!                  do j=1,last_ij
+!                     tval%elms(j,last_kl) = huge(0._prec)
+!                  enddo
+!               endif 
+               endif
                end associate
             enddo
       endif
@@ -1222,7 +1268,7 @@ subroutine print_I_Lambda(LPRINT)
 implicit none
 integer, intent(in) :: LPRINT
 integer :: iTwo
-integer :: start_uv,offset_uv
+integer :: start_uv
 integer :: i,j,k
 
 if(LPRINT>=10) then
@@ -1241,22 +1287,23 @@ if(LPRINT>=10) then
             write(LOUT,'(4i3,2(f18.8,i5))') &
                  Two%iexp,Two%jexp,Two%kexp,Two%lexp,&
                  Two%ijalpha,Two%ijrange,Two%klalpha,Two%klrange
-           if(LPRINT>=100) then
+!           if(LPRINT>=100) then
+           if(LPRINT>=1) then
               do k=1,size(Two%t_val)
                  associate(tval => Two%t_val(k))
 !                 write(*,*) 'SIZE: ', size(tval%elms)
                  write(*,'(18x,a,2x,a)') 'L', 'c :'
                  start_uv = tval%lambda
-                 offset_uv = -tval%lambda+1
                  !if(tval%lambda.eq.2) then
                     do j=start_uv,Two%klrange
                        do i=start_uv,Two%ijrange
                             write(LOUT,'(10x,4i3,a,es45.33)') i, j, tval%lambda, tval%two_t,' : ',&
-                                  tval%elms(offset_uv + i,offset_uv + j)
+                                  tval%elms(offsetTwo_uv + i,offsetTwo_uv + j)
                        enddo
                     enddo
                  !endif
                  !write(*,*) 'TEST: ', Two%ijrange+offset_uv,Two%klrange+offset_uv
+                 write(*,*) 'FIRST:', tval%elms(offsetTwo_uv,offsetTwo_uv)
                  !write(*,*) 'LAST: ', tval%elms(Two%ijrange+offset_uv,Two%klrange+offset_uv)
                  !write(*,*) 'RANGE:', shape(tval%elms(:,1)), shape(tval%elms(1,:)) 
                  !write(*,*) 'LAST: ', tval%elms(shape(tval%elms(:,1)),shape(tval%elms(1,:))) 
