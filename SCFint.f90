@@ -296,7 +296,6 @@ do l_prim=1,lOrbSystem%n_prim
                          klpos = klpos + 1
 
                          klelms = offsetTwo_uv + k + l + kOrbl + lOrbl
-                         !klelms = offsetTwo_uv + k + l
 
                          jpos = jOrbSpec%offset*i_nbas
                          do j=0,jOrbSpec%irange
@@ -309,7 +308,9 @@ do l_prim=1,lOrbSystem%n_prim
                                     offsetTwo_uv + i + j + iOrbl + jOrbl, &
                                     klelms)
 
-!                               write(*,*) matJ(ijpos,klpos), i+1, j+1, k+1, l+1
+!                               write(*,*) matJ(ijpos,klpos),iOrbSpec%offset+i+1,jOrbSpec%offset+j+1, &
+!                                           kOrbSpec%offset+k+1,lOrbSpec%offset+l+1
+ 
 !                               matJ(ijpos,klpos) = Two%elms( &
 !                                    offsetTwo_uv + i + j, &
 !                                    klelms)
@@ -343,8 +344,10 @@ do l_prim=1,lOrbSystem%n_prim
                                     prefac*tval%elms( &
                                     klelms, &
                                     offsetTwo_uv + i + j + iOrbl + jOrbl)
-!                               write(*,*) matJ(ijpos,klpos), i+1, j+1, k+1, l+1
-!
+!                               write(*,*) matJ(ijpos,klpos), & 
+!                                          iOrbSpec%offset+i+1,jOrbSpec%offset+j+1, &
+!                                          kOrbSpec%offset+k+1,lOrbSpec%offset+l+1
+
 !                               matJ(ijpos,klpos) = Two%elms( &
 !                                    klelms, &
 !                                    offsetTwo_uv + i + j)
@@ -368,6 +371,24 @@ do l_prim=1,lOrbSystem%n_prim
    enddo
 enddo
 
+! block
+!   integer :: iunit,ios
+!   integer :: i,j,k,l
+!   real(prec) :: math,calc,rel
+!   if(iOrbSystem%lorb==1.and.kOrbSystem%lorb==0) then
+!      open(newunit=iunit,&
+!           file='/home/hapka/Documents/Results/Expl_corr/DRAKE-MAT/JppDss.dat')
+!      do
+!         read(iunit,*,iostat=ios) i,j,k,l,math
+!         if(ios<0) exit
+!         calc = matJ(i+(j-1)*iOrbSystem%nbas,k+(l-1)*kOrbSystem%nbas)
+!         rel = (calc-math)/math
+!         if(abs(rel)>1.e-34) write(*,*) i,j,k,l,rel
+!      enddo
+!      close(iunit)
+!   endif
+! end block
+
 end subroutine SCFint_matJ
 
 subroutine SCFint_matK(matK,iOrbSystem,jOrbSystem,kOrbSystem,lOrbSystem,lambda,prefac)
@@ -382,7 +403,7 @@ integer :: iexp,jexp,kexp,lexp,ikmin,ikmax,jlmin,jlmax,ikexp,jlexp
 logical :: ikjlorder
 integer :: i_nbas,k_nbas
 integer :: i,j,k,l,ijpos,jpos,klpos,lpos,ilelms
-!integer :: jlelms
+integer :: jlelms
 integer :: iOrbl,jOrbl,kOrbl,lOrbl
 
 
@@ -449,19 +470,21 @@ do l_prim=1,lOrbSystem%n_prim
                          jpos = jOrbSpec%offset*i_nbas
                          do j=0,jOrbSpec%irange
                             ijpos = jpos + iOrbSpec%offset
-                            !jlelms = offsetTwo_uv + j + jOrbl + l + lOrbl
-                            !jlelms = offsetTwo_uv + j + l
+                            jlelms = offsetTwo_uv + j + jOrbl + l + lOrbl
                             do i=0,iOrbSpec%irange
-                               ilelms = offsetTwo_uv + i + iOrbl + l + lOrbl
+                               !ilelms = offsetTwo_uv + i + iOrbl + l + lOrbl
                                ijpos = ijpos + 1
 
                                matK(ijpos,klpos) = matK(ijpos,klpos) + &
                                     prefac*tval%elms( &
-                                    offsetTwo_uv + j + k + jOrbl + kOrbl, &
-                                    ilelms)
+                                    offsetTwo_uv + i + k + iOrbl + kOrbl, &
+                                    !offsetTwo_uv + j + k + jOrbl + kOrbl, &
+                                    !ilelms)
+                                    jlelms)
 
 
-!                               write(*,*) 'O: ', matK(ijpos,klpos), i+1,j+1,k+1,l+1
+!                               write(*,*) 'O: ', matK(ijpos,klpos), iOrbSpec%offset+i+1,jOrbSpec%offset+j+1, & 
+!                                           kOrbSpec%offset+k+1,lOrbSpec%offset+l+1
 !                               matK(ijpos,klpos) = Two%elms( &
 !                                    offsetTwo_uv + i + k, &
 !                                    jlelms)
@@ -485,17 +508,20 @@ do l_prim=1,lOrbSystem%n_prim
                          jpos = jOrbSpec%offset*i_nbas
                          do j=0,jOrbSpec%irange
                             ijpos = jpos + iOrbSpec%offset
-                            !jlelms = offsetTwo_uv + j + jOrbl + l + lOrbl
+                            jlelms = offsetTwo_uv + j + jOrbl + l + lOrbl
                             do i=0,iOrbSpec%irange
-                               ilelms = offsetTwo_uv + i + iOrbl + l + lOrbl
+                               !ilelms = offsetTwo_uv + i + iOrbl + l + lOrbl
                                ijpos = ijpos + 1
 
                                matK(ijpos,klpos) = matK(ijpos,klpos) + &
-                                    prefac*tval%elms(ilelms, &
+                                    prefac*tval%elms(jlelms, &
                                    ! ilelms, &
-                                    offsetTwo_uv + j + k + jOrbl + kOrbl)
+                                   !offsetTwo_uv + j + k + jOrbl + kOrbl)
+                                    offsetTwo_uv + i + k + iOrbl + kOrbl)
                                   
-!                               write(*,*) 'U:', matK(ijpos,klpos), i+1,j+1,k+1,l+1
+!                               write(*,*) 'U:', matK(ijpos,klpos), iOrbSpec%offset+i+1,jOrbSpec%offset+j+1, & 
+!                                           kOrbSpec%offset+k+1,lOrbSpec%offset+l+1
+
 !                               matK(ijpos,klpos) = Two%elms( &
 !                                    jlelms, &
 !                                    offsetTwo_uv + i + k)
@@ -518,6 +544,26 @@ do l_prim=1,lOrbSystem%n_prim
       enddo
    enddo
 enddo
+
+!block
+!  integer :: iunit,ios
+!  integer :: i,j,k,l
+!  real(prec) :: math,calc,rel
+!  if(iOrbSystem%lorb==1.and.kOrbSystem%lorb==1) then
+!     open(newunit=iunit,&
+!          file='/home/hapka/Documents/Results/Expl_corr/DRAKE-MAT/KppDpp.dat')
+!     do
+!        read(iunit,*,iostat=ios) i,j,k,l,math
+!        if(ios<0) exit
+!        calc = matK(i+(j-1)*iOrbSystem%nbas,k+(l-1)*kOrbSystem%nbas)
+!        !calc = matK(i+(j-1)*iOrbSystem%nbas,l+(k-1)*lOrbSystem%nbas)
+!        rel = (calc-math)/math
+!        if(abs(rel)>1.e-33) write(*,*) i,j,k,l,rel
+!     enddo
+!     close(iunit)
+!  endif
+!end block
+
 
 end subroutine SCFint_matK
 
@@ -765,8 +811,6 @@ integer :: ijM, klM, ijP, klP
                    tmp2=maxrange2
                    maxrange1 = jOrbSpec%max_lrange(jval) + iOrbSpec%max_lrange(ival)
                    maxrange2 = kOrbSpec%max_lrange(kval) + lOrbSpec%max_lrange(lval)
-   !               write(*,'(a,*(i7))') '(ij|kl):', iexp, jexp, kexp, lexp 
-   !               print*, "max_ij, max_kl", maxrange1, maxrange2
                    if(tmp1.gt.maxrange1) maxrange1 = tmp1
                    if(tmp2.gt.maxrange2) maxrange2 = tmp2
                    doint=.true.
@@ -878,7 +922,6 @@ do lexp=1,Nexp
                       shift = 1
                       shift(max4l/2+1) = 0 !-1 
                    endif
-!                   write(*,*) shift
 
                    allocate(Two%t_val(1+max4l/2))
 
@@ -1080,16 +1123,6 @@ do iTwo=1,sizeTwo
               enddo
            enddo
 
-  !         do j=smallest_I1_uv,Two%klrange
-  !            do i=smallest_I1_uv,Two%ijrange
-
-  !               Two%t_val(span+2-ival)%elms(i,j)= 0.5_prec* ( &
-  !               Two%t_val(span+1-ival)%elms(offsetTwo_uv+i+1,offsetTwo_uv+j-1) + &
-  !               Two%t_val(span+1-ival)%elms(offsetTwo_uv+i-1,offsetTwo_uv+j+1) - &
-  !               Two%t_val(span+2-ival)%elms(offsetTwo_uv+i-1,offsetTwo_uv+j-1) ) 
-  !            enddo
-  !         enddo
-
         Two%t_val(span+2-ival)%two_t = Two%t_val(span+2-ival)%two_t - 2   
         Two%t_val(span+2-ival)%lambda = 1   
 
@@ -1114,18 +1147,6 @@ do iTwo=1,sizeTwo
                 enddo
              enddo
 
-! first test
-!           offset_I_uv = -jval
-!             do j=start_uv,Two%klrange 
-!                do i=start_uv,Two%ijrange 
-!
-!                   Two%t_val(span+2-ival+jval)%elms(offset_I_uv+i,offset_I_uv+j) = prefac* ( &
-!                   Two%t_val(span+2-ival+jval)%elms(i+pos-1,j+pos-1)) + &
-!                   Two%t_val(span-ival+jval)%elms(i+pos+1,j+pos+1) 
-!
-!                enddo
-!             enddo
-
            pos = pos - 1
            Two%t_val(span+2-ival+jval)%lambda = Two%t_val(span+2-ival+jval)%lambda + 1
            Two%t_val(span+2-ival+jval)%two_t = Two%t_val(span+2-ival+jval)%two_t - 2
@@ -1140,47 +1161,47 @@ do iTwo=1,sizeTwo
 enddo
 
 ! fill unused space
-do iTwo=1,sizeTwo
-   associate(Two => TwoInt(iTwo))
-      if(Two%isUsed) then
-            do k=1,size(Two%t_val)
-               associate(tval => Two%t_val(k))
-               if(tval%lambda.gt.0) then
-!
-!               offset_uv = -tval%lambda+1
-!               ijOff = Two%ijrange+offset_uv
-!               klOff = Two%klrange+offset_uv
-               last    = shape(tval%elms) 
-               last_ij = last(1)
-               last_kl = last(2)
-
-               do i=1,tval%lambda
-                  do j=1,last_kl
-                     tval%elms(i,j) = huge(0._prec)
-                  enddo
-               enddo
-
-               do i=1,tval%lambda
-                  do j=1,last_ij
-                     tval%elms(j,i) = huge(0._prec)
-                  enddo
-               enddo
-
-
-!               if((ijOff.ne.last_ij).and.(klOff.ne.last_kl)) then
-!                  do i=1,last_kl
-!                     tval%elms(last_ij,i) = huge(0._prec)
-!                  enddo
-!                  do j=1,last_ij
-!                     tval%elms(j,last_kl) = huge(0._prec)
-!                  enddo
-!               endif 
-               endif
-               end associate
-            enddo
-      endif
-   end associate
-enddo
+  do iTwo=1,sizeTwo
+     associate(Two => TwoInt(iTwo))
+        if(Two%isUsed) then
+              do k=1,size(Two%t_val)
+                 associate(tval => Two%t_val(k))
+                 if(tval%lambda.gt.0) then
+  !
+  !               offset_uv = -tval%lambda+1
+  !               ijOff = Two%ijrange+offset_uv
+  !               klOff = Two%klrange+offset_uv
+                 last    = shape(tval%elms) 
+                 last_ij = last(1)
+                 last_kl = last(2)
+  
+                 do i=1,tval%lambda
+                    do j=1,last_kl
+                       tval%elms(i,j) = huge(0._prec)
+                    enddo
+                 enddo
+  
+                 do i=1,tval%lambda
+                    do j=1,last_ij
+                       tval%elms(j,i) = huge(0._prec)
+                    enddo
+                 enddo
+  
+  
+  !               if((ijOff.ne.last_ij).and.(klOff.ne.last_kl)) then
+  !                  do i=1,last_kl
+  !                     tval%elms(last_ij,i) = huge(0._prec)
+  !                  enddo
+  !                  do j=1,last_ij
+  !                     tval%elms(j,last_kl) = huge(0._prec)
+  !                  enddo
+  !               endif 
+                 endif
+                 end associate
+              enddo
+        endif
+     end associate
+  enddo
 
 end subroutine create_I_Lambda
 
@@ -1287,11 +1308,9 @@ if(LPRINT>=10) then
             write(LOUT,'(4i3,2(f18.8,i5))') &
                  Two%iexp,Two%jexp,Two%kexp,Two%lexp,&
                  Two%ijalpha,Two%ijrange,Two%klalpha,Two%klrange
-!           if(LPRINT>=100) then
-           if(LPRINT>=1) then
+           if(LPRINT>=100) then
               do k=1,size(Two%t_val)
                  associate(tval => Two%t_val(k))
-!                 write(*,*) 'SIZE: ', size(tval%elms)
                  write(*,'(18x,a,2x,a)') 'L', 'c :'
                  start_uv = tval%lambda
                  !if(tval%lambda.eq.2) then
@@ -1302,11 +1321,6 @@ if(LPRINT>=10) then
                        enddo
                     enddo
                  !endif
-                 !write(*,*) 'TEST: ', Two%ijrange+offset_uv,Two%klrange+offset_uv
-                 write(*,*) 'FIRST:', tval%elms(offsetTwo_uv,offsetTwo_uv)
-                 !write(*,*) 'LAST: ', tval%elms(Two%ijrange+offset_uv,Two%klrange+offset_uv)
-                 !write(*,*) 'RANGE:', shape(tval%elms(:,1)), shape(tval%elms(1,:)) 
-                 !write(*,*) 'LAST: ', tval%elms(shape(tval%elms(:,1)),shape(tval%elms(1,:))) 
                  end associate
               enddo           
            endif

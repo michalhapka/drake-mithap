@@ -24,6 +24,11 @@ type Problem_l_Data
 real(prec), allocatable :: H(:,:)
 real(prec), allocatable :: S(:,:)
 real(prec), allocatable :: D(:,:)
+real(prec), allocatable :: F(:,:)
+real(prec), allocatable :: G(:,:)
+real(prec), allocatable :: OrbC(:,:)
+real(prec), allocatable :: OrbE(:)
+real(prec) :: energy
 end type Problem_l_Data 
 
 type Problem_ll_Data
@@ -160,6 +165,7 @@ integer :: i
 end subroutine chooseSCF
 
 subroutine SCF_energy_common(maxl,norb,OrbSystem_L,OrbReduced,Control,fullPRINT)
+use angmom
 implicit none
 integer :: maxl
 !integer,intent(in) :: norb
@@ -197,7 +203,6 @@ allocate(problem_ll(maxl+1,maxl+1))
 do i=1,maxl+1
    call mem_alloc(problem_l(i)%H,nbas(i),nbas(i))
    call mem_alloc(problem_l(i)%S,nbas(i),nbas(i))
-! add twoel!
 enddo
 
 do i=1,maxl+1
@@ -271,6 +276,19 @@ enddo
 call free_refJK(maxl)
 call free_SCFint
 
+
+do i=1,maxl+1
+   call mem_alloc(problem_l(i)%D,nbas(i),nbas(i))
+   call mem_alloc(problem_l(i)%F,nbas(i),nbas(i))
+   call mem_alloc(problem_l(i)%G,nbas(i),nbas(i))
+   call mem_alloc(problem_l(i)%OrbC,nbas(i),nbas(i))
+   call mem_alloc(problem_l(i)%OrbE,nbas(i))
+enddo
+
+call Roothaan_iterations(maxl,norb,nbas,converged,energy,&
+                         Control,LPRINT_mod)
+
+! hapka: old_drake
 !call mem_alloc(eval,nbas)
 !call mem_alloc(evec,nbas,nbas)
 !call mem_alloc(matF,nbas,nbas)
@@ -280,20 +298,28 @@ call free_SCFint
 !call Roothaan_iterations(norb,nbas,converged,energy,eval,evec,&
 !     matH,matS,twoel,matF,matG,dens,Control,LPRINT_mod)
 
-!if(fullPRINT) then
-!   write(LOUT,'()')
-!   write(LOUT,'(a)') 'Orbital energies'
-!   do i=1,norb
-!      write(LOUT,'(i5,f25.18)') i,eval(i)
-!   enddo
-!   write(LOUT,'()')
-!   if(converged) then
-!      write(LOUT,'(a,f25.18)') '    Converged SCF energy: ',energy
-!   else
-!      write(LOUT,'(a,f25.18)') 'NOT converged SCF energy: ',energy
-!   endif
-!endif
-!
+if(fullPRINT) then
+   do j=0,maxl
+      associate(& 
+         OrbE => problem_l(j+1)%OrbE, &
+         OrbC => problem_l(j+1)%OrbC, &
+         norb => norb(j+1) )
+
+         write(LOUT,'()')
+         write(LOUT,'(a)') 'Orbital '//get_angmom_name(j)//' energies'
+         do i=1,norb
+            write(LOUT,'(i5,f25.18)') i,OrbE(i)
+         enddo
+         write(LOUT,'()')
+      end associate
+   enddo
+   if(converged) then
+      write(LOUT,'(a,f25.18)') '    Converged SCF energy: ',energy
+   else
+      write(LOUT,'(a,f25.18)') 'NOT converged SCF energy: ',energy
+   endif
+endif
+
 !RESULT_energy = energy
 !
 !if(associated(RESULT_extend)) then
@@ -333,6 +359,11 @@ call free_SCFint
 do i=1,maxl+1
    call mem_dealloc(problem_l(i)%H)
    call mem_dealloc(problem_l(i)%S)
+   call mem_dealloc(problem_l(i)%D)
+   call mem_dealloc(problem_l(i)%F)
+   call mem_dealloc(problem_l(i)%G)
+   call mem_dealloc(problem_l(i)%OrbC)
+   call mem_dealloc(problem_l(i)%OrbE)
 enddo
 
 do i=1,maxl+1
@@ -425,8 +456,8 @@ if(LPRINT_mod>=1) then
    write(LOUT,'()')
 endif
 
-call Roothaan_iterations(2,nbas1,converged,energy1,eval1,evec1,&
-     matH1,matS1,matJ1,matF,matG,dens,Control,LPRINT_mod)
+!call Roothaan_iterations(2,nbas1,converged,energy1,eval1,evec1,&
+!     matH1,matS1,matJ1,matF,matG,dens,Control,LPRINT_mod)
 
 if(LPRINT_mod>=1) then
    write(LOUT,'()')
@@ -449,8 +480,8 @@ if(LPRINT_mod>=1) then
    write(LOUT,'()')
 endif
 
-call Roothaan_iterations(2,nbas2,converged,energy2,eval2,evec2,&
-     matH2,matS2,matJ2,matF,matG,dens,Control,LPRINT_mod)
+!call Roothaan_iterations(2,nbas2,converged,energy2,eval2,evec2,&
+!     matH2,matS2,matJ2,matF,matG,dens,Control,LPRINT_mod)
 
 if(LPRINT_mod>=1) then
    write(LOUT,'()')
@@ -718,20 +749,27 @@ endif
 
 end subroutine SCF_energy_separate
 
-subroutine Roothaan_iterations(norb,nbas,converged,energy,eval,evec,&
-     matH,matS,twoel,matF,matG,dens,Control,LPRINT)
+!subroutine Roothaan_iterations(norb,nbas,converged,energy,eval,evec,&
+!                               matH,matS,twoel,matF,matG,dens,Control,LPRINT)
+subroutine Roothaan_iterations(maxl,norb,nbas,converged,energy,&
+                               Control,LPRINT)
+use angmom
 implicit none
-integer,intent(in) :: norb,nbas
+!integer,intent(in) :: norb,nbas
+integer,intent(in) :: maxl
+integer,intent(in) :: norb(:),nbas(:)
 logical,intent(out) :: converged
-real(prec),intent(out) :: energy,eval(:),evec(:,:)
-real(prec),intent(in) :: matH(:,:),matS(:,:),twoel(:,:)
-real(prec) :: matF(:,:),matG(:,:),dens(:,:)
+real(prec),intent(out) :: energy
+!real(prec),intent(out) :: energy,eval(:),evec(:,:)
+!real(prec),intent(in) :: matH(:,:),matS(:,:),twoel(:,:)
+!real(prec) :: matF(:,:),matG(:,:),dens(:,:)
 type(ControlData),intent(in) :: Control
 integer,intent(in) :: LPRINT
 logical :: level_shifting
 integer :: iter,cnt_min
 real(prec) :: energy_prev,energy_delta,energy_delta_min
-integer :: i
+real(prec) :: prefac
+integer :: i, j, k
 
 level_shifting = (Control%SCFSHIFTVAL>0._prec.and.Control%SCFSHIFTBRK>0)
 if(level_shifting.and.LPRINT>=1) then
@@ -741,127 +779,262 @@ if(level_shifting.and.LPRINT>=1) then
    write(LOUT,'(a,i4)') 'BRK = ',Control%SCFSHIFTBRK
 endif
 
-if(LPRINT>=2) then
-   write(LOUT,'()')
-   write(LOUT,'(5x,a)') 'Checking the overlap matrix'
+ if(LPRINT>=2) then
+    do i=0,maxl 
+       write(LOUT,'()')
+       write(LOUT,'(5x,a)') 'Checking the '//get_angmom_name(i)//' overlap matrix'
+       associate(matS => problem_l(i+1)%S, &
+                 OrbC => problem_l(i+1)%OrbC, &
+                 OrbE => problem_l(i+1)%OrbE, &
+                 nbas => nbas(i+1) )
 
-   call symU_diagonalize_qd('QL',nbas,eval,evec,matS)
-   call test_diagonalize_qd(nbas,eval,evec,matS)
+         ! hapka: old_drake
+         !call symU_diagonalize_qd('QL',nbas,eval,evec,matS)
+         !call test_diagonalize_qd(nbas,eval,evec,matS)
 
-   write(LOUT,'()')
-   if(nbas>2*number_OVERLAP+1) then
-      write(LOUT,'(a)') 'A few smallest and largest eigenvalues &
-           &of the overlap matrix'
-      do i=1,number_OVERLAP
-         write(LOUT,'(i5,es18.6)') i,eval(i)
-      enddo
-      write(LOUT,'(2x,a)') '---'
-      do i=nbas-number_OVERLAP+1,nbas
-         write(LOUT,'(i5,es18.6)') i,eval(i)
-      enddo
-   else
-      write(LOUT,'(a)') 'Eigenvalues of the overlap matrix'
-      do i=1,nbas
-         write(LOUT,'(i5,es18.6)') i,eval(i)
-      enddo
-   endif
-endif
+         call symU_diagonalize_qd('QL',nbas,OrbE,OrbC,matS)
+         call test_diagonalize_qd(nbas,OrbE,OrbC,matS)
+    
+       write(LOUT,'()')
+       if(nbas>2*number_OVERLAP+1) then
+          write(LOUT,'(a)') 'A few smallest and largest eigenvalues &
+               &of the '//get_angmom_name(i)//' overlap matrix'
+          do j=1,number_OVERLAP
+             write(LOUT,'(i5,es18.6)') j,OrbE(j)
+          enddo
+          write(LOUT,'(2x,a)') '---'
+          do j=nbas-number_OVERLAP+1,nbas
+             write(LOUT,'(i5,es18.6)') j,OrbE(j)
+          enddo
+       else
+          write(LOUT,'(a)') 'Eigenvalues of the overlap matrix'
+          do j=1,nbas
+             write(LOUT,'(i5,es18.6)') j,OrbE(j)
+          enddo
+       endif
+       end associate
+    enddo
+ endif
+ 
+ iter = 0
+ 
+ if(LPRINT>=2) then
+    write(LOUT,'()')
+    write(LOUT,'(5x,a)') 'Checking zeroth SCF iteration'
+ endif
 
-iter = 0
+ do i=0,maxl
+    associate(&
+        matS => problem_l(i+1)%S, &
+        matH => problem_l(i+1)%H, &
+        dens => problem_l(i+1)%D, &
+        OrbC => problem_l(i+1)%OrbC, &
+        OrbE => problem_l(i+1)%OrbE, &
+        energy => problem_l(i+1)%energy, &
+        norb => norb(i+1), & 
+        nbas => nbas(i+1) )
 
-if(LPRINT>=2) then
-   write(LOUT,'()')
-   write(LOUT,'(5x,a)') 'Checking zeroth SCF iteration'
-endif
+        ! hapka: old_drake
+        !call symU_diagonalize_qd('QL',nbas,eval,evec,matH,matS)
+        !if(LPRINT>=2) call test_diagonalize_qd(nbas,eval,evec,matH,matS)
+        
+        call symU_diagonalize_qd('QL',nbas,OrbE,OrbC,matH,matS)
+        if(LPRINT>=2) call test_diagonalize_qd(nbas,OrbE,OrbC,matH,matS)
+        do j=1,norb
+           call make_dens(nbas,nbas,OrbC(:,j),OrbC(:,j),dens,j==1)
+        enddo
+        energy = 2._prec*make_trace(nbas,nbas,matH,dens)
+ 
+        if(LPRINT>=2) then
+           write(LOUT,'()')
+           write(LOUT,'(a)') 'Orbital '//get_angmom_name(i)//' energies'
+           do j=1,norb
+              write(LOUT,'(i5,f25.18)') j,OrbE(j)
+           enddo
+        endif
 
-call symU_diagonalize_qd('QL',nbas,eval,evec,matH,matS)
-if(LPRINT>=2) call test_diagonalize_qd(nbas,eval,evec,matH,matS)
-do i=1,norb
-   call make_dens(nbas,nbas,evec(:,i),evec(:,i),dens,i==1)
-enddo
-energy = 2._prec*make_trace(nbas,nbas,matH,dens)
+    end associate
 
-if(LPRINT>=2) then
-   write(LOUT,'()')
-   write(LOUT,'(a)') 'Orbital energies'
-   do i=1,norb
-      write(LOUT,'(i5,f25.18)') i,eval(i)
-   enddo
-endif
+    prefac = 2._prec*i + 1._prec 
+    energy = energy + prefac*problem_l(i+1)%energy
 
-if(LPRINT>=1) then
-   write(LOUT,'()')
-   write(LOUT,'(1x,a,12x,a,12x,a,2x,a)') &
-        'iter','energy','energy change','min-change counter'
-   write(LOUT,'(i5,f25.18)') iter,energy
-endif
+ enddo
 
-iter = 1
+! hapka: old_drake
+! call symU_diagonalize_qd('QL',nbas,eval,evec,matH,matS)
+! if(LPRINT>=2) call test_diagonalize_qd(nbas,eval,evec,matH,matS)
+! do i=1,norb
+!    call make_dens(nbas,nbas,evec(:,i),evec(:,i),dens,i==1)
+! enddo
+! energy = 2._prec*make_trace(nbas,nbas,matH,dens)
+! 
+! if(LPRINT>=2) then
+!    write(LOUT,'()')
+!    write(LOUT,'(a)') 'Orbital energies'
+!    do i=1,norb
+!       write(LOUT,'(i5,f25.18)') i,eval(i)
+!    enddo
+! endif
 
-cnt_min = 0
-energy_delta_min = huge(0._prec)
-converged = .false.
-do
-   energy_prev = energy
 
-   call make_matG_1(2._prec,-1._prec,nbas,matG,twoel,dens)
+ if(LPRINT>=1) then
+    write(LOUT,'()')
+    write(LOUT,'(1x,a,12x,a,12x,a,2x,a)') &
+         'iter','energy','energy change','min-change counter'
+    write(LOUT,'(i5,f25.18)') iter,energy
+ endif
+ 
+ iter = 1
+ 
+ cnt_min = 0
+ energy_delta_min = huge(0._prec)
+ converged = .false.
+ do
+    energy_prev = energy
 
-   if(level_shifting.and.iter<=Control%SCFSHIFTBRK) then
-      call make_matmul(nbas,matS,evec,matF)
-      do i=norb+1,nbas
-         call make_dens(nbas,nbas,matF(:,i),matF(:,i),dens,i==(norb+1))
-      enddo
-      matF(1:nbas,1:nbas) = matH(1:nbas,1:nbas) + matG(1:nbas,1:nbas) &
-           + Control%SCFSHIFTVAL*dens(1:nbas,1:nbas)
-   else
-      matF(1:nbas,1:nbas) = matH(1:nbas,1:nbas) + matG(1:nbas,1:nbas)
-   endif
-   call symU_diagonalize_qd('QL',nbas,eval,evec,matF,matS)
-   do i=1,norb
-      call make_dens(nbas,nbas,evec(:,i),evec(:,i),dens,i==1)
-   enddo
+    do i=0,maxl
+       associate(&
+        matG => problem_l(i+1)%G, &
+        nbas_ij => nbas(i+1) )
 
-   energy = &
-        + 2._prec*(make_trace(nbas,nbas,matH,dens) &
-        + 0.5_prec*make_trace(nbas,nbas,matG,dens))
+       matG = 0._prec
+       do j=0,maxl  
+          associate(&
+           dens => problem_l(j+1)%D, & 
+           matJ => problem_ll(i+1,j+1)%J, & 
+           matK => problem_ll(i+1,j+1)%K, & 
+           nbas_kl => nbas(j+1) )
 
-   energy_delta = abs(energy-energy_prev)
-   if(energy_delta<energy_delta_min) then
-      cnt_min = 0
-      energy_delta_min = energy_delta
-   else
-      cnt_min = cnt_min + 1
-   endif
+           call make_matG_2( 2._prec,nbas_ij,nbas_kl,matG,1,matJ,dens,.false.)
+           call make_matG_2(-1._prec,nbas_ij,nbas_kl,matG,1,matK,dens,.false.)
+ 
+          end associate
+       enddo
 
-   if(LPRINT>=1) write(LOUT,'(i5,f25.18,es18.6,6x,i5)') &
-        iter,energy,energy_delta,cnt_min
+       end associate
+    enddo    
+ 
+    energy = 0._prec
+    do i=0,maxl
+       associate(&
+         matS => problem_l(i+1)%S, &
+         matH => problem_l(i+1)%H, &
+         matF => problem_l(i+1)%F, &
+         matG => problem_l(i+1)%G, &
+         dens => problem_l(i+1)%D, &
+         OrbE => problem_l(i+1)%OrbE, &
+         OrbC => problem_l(i+1)%OrbC, &
+         norb => norb(i+1), & 
+         nbas => nbas(i+1), &
+         energy => problem_l(i+1)%energy )
 
-   iter = iter + 1
+         if(level_shifting.and.iter<=Control%SCFSHIFTBRK) then
+            call make_matmul(nbas,matS,OrbC,matF)
+            do j=norb+1,nbas
+               call make_dens(nbas,nbas,matF(:,j),matF(:,j),dens,j==(norb+1))
+            enddo
+            matF(1:nbas,1:nbas) = matH(1:nbas,1:nbas) + matG(1:nbas,1:nbas) &
+                 + Control%SCFSHIFTVAL*dens(1:nbas,1:nbas)
+         else
+            matF(1:nbas,1:nbas) = matH(1:nbas,1:nbas) + matG(1:nbas,1:nbas)
+         endif
 
-   if(energy_delta<Control%SCFTHR) then
-      converged = .true.
-      exit
-   endif
-   if(iter>Control%SCFMAXIT) then
-      write(LOUT,'(a,i5,a,es10.3,a)') 'WARNING!!! &
-           &SCF did not converge in SCFMAXIT =', &
-           Control%SCFMAXIT,' iterations!     (',energy_delta,' )'
-      exit
-   endif
-   if(cnt_min>=Control%SCFCNT) then
-      write(LOUT,'(a,i5,a,es10.3,a)') 'WARNING!!! &
-           &No significant change in last SCFCNT =', &
-           Control%SCFCNT,' iterations! (',energy_delta,' )'
-      exit
-   endif
-enddo
+        
+      !   energy = &
+      !         + 2._prec*(make_trace(nbas,nbas,matH,dens) &
+      !         + 0.5_prec*make_trace(nbas,nbas,matG,dens))
+      !   write(*,*) 'energy-L: ', energy
+         call symU_diagonalize_qd('QL',nbas,OrbE,OrbC,matF,matS)
 
-if(LPRINT>=2) then
-   write(LOUT,'()')
-   write(LOUT,'(5x,a)') 'Checking last SCF iteration'
 
-   call test_diagonalize_qd(nbas,eval,evec,matF,matS)
-endif
+         do j=1,norb
+            call make_dens(nbas,nbas,OrbC(:,j),OrbC(:,j),dens,j==1)
+         enddo
+
+         energy = &
+               + 2._prec*(make_trace(nbas,nbas,matH,dens) &
+               + 0.5_prec*make_trace(nbas,nbas,matG,dens))
+
+       end associate
+      
+       prefac = 2._prec*i + 1._prec
+       energy = energy + prefac*problem_l(i+1)%energy
+       
+    enddo
+
+    energy_delta = abs(energy-energy_prev)
+
+! hapka: old_drake
+!    call make_matG_1(2._prec,-1._prec,nbas,matG,twoel,dens)
+
+!    if(level_shifting.and.iter<=Control%SCFSHIFTBRK) then
+!       call make_matmul(nbas,matS,evec,matF)
+!       do i=norb+1,nbas
+!          call make_dens(nbas,nbas,matF(:,i),matF(:,i),dens,i==(norb+1))
+!       enddo
+!       matF(1:nbas,1:nbas) = matH(1:nbas,1:nbas) + matG(1:nbas,1:nbas) &
+!            + Control%SCFSHIFTVAL*dens(1:nbas,1:nbas)
+!    else
+!       matF(1:nbas,1:nbas) = matH(1:nbas,1:nbas) + matG(1:nbas,1:nbas)
+!    endif
+!    call symU_diagonalize_qd('QL',nbas,eval,evec,matF,matS)
+!    do i=1,norb
+!       call make_dens(nbas,nbas,evec(:,i),evec(:,i),dens,i==1)
+!    enddo
+! 
+!    energy = &
+!         + 2._prec*(make_trace(nbas,nbas,matH,dens) &
+!         + 0.5_prec*make_trace(nbas,nbas,matG,dens))
+! 
+!    energy_delta = abs(energy-energy_prev)
+
+    if(energy_delta<energy_delta_min) then
+       cnt_min = 0
+       energy_delta_min = energy_delta
+    else
+       cnt_min = cnt_min + 1
+    endif
+ 
+    if(LPRINT>=1) write(LOUT,'(i5,f25.18,es18.6,6x,i5)') &
+         iter,energy,energy_delta,cnt_min
+ 
+    iter = iter + 1
+ 
+    if(energy_delta<Control%SCFTHR) then
+       converged = .true.
+       exit
+    endif
+    if(iter>Control%SCFMAXIT) then
+!    if(iter>50 ) then
+       write(LOUT,'(a,i5,a,es10.3,a)') 'WARNING!!! &
+            &SCF did not converge in SCFMAXIT =', &
+            Control%SCFMAXIT,' iterations!     (',energy_delta,' )'
+       exit
+    endif
+    if(cnt_min>=Control%SCFCNT) then
+       write(LOUT,'(a,i5,a,es10.3,a)') 'WARNING!!! &
+            &No significant change in last SCFCNT =', &
+            Control%SCFCNT,' iterations! (',energy_delta,' )'
+       exit
+    endif
+ enddo
+ 
+ if(LPRINT>=2) then
+    write(LOUT,'()')
+    write(LOUT,'(5x,a)') 'Checking last SCF iteration'
+    
+    do i=0,maxl
+       associate(&
+        matS => problem_l(i+1)%S, &
+        matF => problem_l(i+1)%F, &
+        OrbE => problem_l(i+1)%OrbE, &
+        OrbC => problem_l(i+1)%OrbC, &
+        nbas => nbas(i+1) )
+
+        call test_diagonalize_qd(nbas,OrbE,OrbC,matF,matS)
+       end associate
+    enddo
+ endif
 
 end subroutine Roothaan_iterations
 
@@ -1129,17 +1302,26 @@ do i=1,maxl+1
    enddo
 enddo
 
-refK(1,1)%lambda(1) = 0
-refK(1,2)%lambda(1) = 1
-refK(2,1)%lambda(1) = 1
-refK(2,2)%lambda(1) = 0
-refK(2,2)%lambda(2) = 2
+if(maxl.gt.0) then
+   refK(1,1)%lambda(1) = 0
+   refK(1,2)%lambda(1) = 1
+   refK(2,1)%lambda(1) = 1
+   refK(2,2)%lambda(1) = 0
+   refK(2,2)%lambda(2) = 2
+else
+   refK(1,1)%lambda(1) = 0
+endif
 
-refK(1,1)%prefac(1) = 0.5_prec
-refK(1,2)%prefac(1) = 1.5_prec
-refK(2,1)%prefac(1) = 0.5_prec
-refK(2,2)%prefac(1) = 0.5_prec
-refK(2,2)%prefac(2) = 1._prec
+
+if(maxl.gt.0) then
+   refK(1,1)%prefac(1) = 0.5_prec
+   refK(1,2)%prefac(1) = 1.5_prec
+   refK(2,1)%prefac(1) = 0.5_prec
+   refK(2,2)%prefac(1) = 0.5_prec
+   refK(2,2)%prefac(2) = 1._prec
+else
+   refK(1,1)%prefac(1) = 0.5_prec
+endif
 
 !deallocate(refJ,refK)
 
