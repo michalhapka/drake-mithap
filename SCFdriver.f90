@@ -191,7 +191,6 @@ integer :: i1,j1,i2,j2,ij2
 LPRINT_mod = merge(Control%LPRINT,0,fullPRINT)
 
 !nbas = OrbSystem%nbas
-
 allocate(nbas(maxl+1))
 
 do i=1,maxl+1
@@ -320,7 +319,7 @@ if(fullPRINT) then
    endif
 endif
 
-!RESULT_energy = energy
+RESULT_energy = energy
 !
 !if(associated(RESULT_extend)) then
 !   RESULT_extend%energy = energy
@@ -963,6 +962,8 @@ endif
     enddo
 
     energy_delta = abs(energy-energy_prev)
+
+    !write(*,*) 'energy: ', energy
 
 ! hapka: old_drake
 !    call make_matG_1(2._prec,-1._prec,nbas,matG,twoel,dens)

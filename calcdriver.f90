@@ -80,24 +80,24 @@ contains
        write(LOUT,'()')
        write(LOUT,'(5x,a)') '--- Initial SCF calculation ---'
        call calculateSCF(System,Control)
-! 
-!       Noptimize = count(System%isOpt_orbs)
-!       call mem_alloc(optimize,Noptimize)
-!       call pack_vector(optimize,&
-!            System%Nexp,System%exponents,System%isOpt_orbs)
-! 
-!       call powell(Noptimize,optimize,energySCF,System,Control)
-! 
-!       call unpack_vector(optimize,&
-!            System%Nexp,System%exponents,System%isOpt_orbs)
-!       call mem_dealloc(optimize)
-! 
-!       write(LOUT,'()')
-!       write(LOUT,'(5x,a)') '--- Final SCF calculation ---'
-!       call calculateSCF(System,Control)
-! 
-!       call print_SystemExponents(System)
-! 
+ 
+       Noptimize = count(System%isOpt_orbs)
+       call mem_alloc(optimize,Noptimize)
+       call pack_vector(optimize,&
+            System%Nexp,System%exponents,System%isOpt_orbs)
+ 
+       call powell(Noptimize,optimize,energySCF,System,Control)
+ 
+       call unpack_vector(optimize,&
+            System%Nexp,System%exponents,System%isOpt_orbs)
+       call mem_dealloc(optimize)
+ 
+       write(LOUT,'()')
+       write(LOUT,'(5x,a)') '--- Final SCF calculation ---'
+       call calculateSCF(System,Control)
+ 
+       call print_SystemExponents(System)
+ 
     else
  
        write(LOUT,'()')

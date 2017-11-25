@@ -50,6 +50,7 @@ x0(:) = xIO
 f0    = energy(x0,System,Control)
 calls_counter = 1
 
+
 write(LOUT,'()')
 write(LOUT,'(1x,a,t11,12x,a,12x,a,4x,a)') &
      'iter','energy','energy change','function calls'
@@ -127,6 +128,7 @@ calls_counter = 0
 x   = xIO - d
 f_l = energy(x,System,Control)
 x   = xIO + d
+
 f_r = energy(x,System,Control)
 calls_counter = calls_counter + 2
 

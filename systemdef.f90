@@ -28,7 +28,7 @@ integer :: Nexp_orig,Nexp
 logical,allocatable :: isUsed_orbs(:,:)
 logical,allocatable :: isUsed_pairs(:),isUsed(:)
 !logical,allocatable :: isUsed_orbs(:),isUsed_pairs(:),isUsed(:)
-logical,allocatable :: isOpt_orbs(:,:)
+logical,allocatable :: isOpt_orbs(:)
 logical,allocatable :: isOpt_pairs(:)
 !logical,allocatable :: isOpt_orbs(:),isOpt_pairs(:)
 integer,allocatable :: exp_reorder(:)
@@ -128,7 +128,7 @@ integer :: i,j,k
  call mem_alloc(isUsed_orbs ,Nexp_orig, Input%maxl+1)
 ! call mem_alloc(isUsed_pairs,Nexp_orig)
  call mem_alloc(isUsed      ,Nexp_orig)
-! call mem_alloc(isOpt_orbs  ,Nexp_orig)
+ call mem_alloc(isOpt_orbs  ,Nexp_orig)
 ! call mem_alloc(isOpt_pairs ,Nexp_orig)
 
 ! hapka: old_drake 
@@ -218,6 +218,49 @@ integer :: i,j,k
 ! isOpt_orbs  = .false.
 ! isOpt_pairs = .false.
 
+
+ if(optimize) then
+    if(post_SCF) then
+
+       write(LOUT,'(a)') 'Post SCF not ready!'
+ 
+  !     isOpt_pairs(:) = (isUsed_pairs.and.Input%optimized)
+ 
+  !     if(.not.any(isOpt_pairs)) then
+  !        write(LOUT,'(a)') 'No pair exponents to optimize!'
+  !        stop
+  !     endif
+ 
+  !     isUsed(:) = (isUsed_orbs.and.isOpt_pairs)
+  !     if(any(isUsed)) then
+  !        write(LOUT,'()')
+  !        write(LOUT,'(a)',advance='no') 'Some orbital and &
+  !             &optimized pair exponents overlap'
+  !        sepspace = ': '
+  !        do i=1,Nexp_orig
+  !           if(isUsed(i)) then
+  !              write(LOUT,'(a,i3)',advance='no') sepspace,i
+  !              sepspace = ', '
+  !           endif
+  !        enddo
+  !        write(LOUT,'()')
+  !        stop
+  !     endif
+ 
+    else
+       do i=1,Nexp_orig 
+          isOpt_orbs(i) = (any(isUsed_orbs(i,:)).and.Input%optimized(i))
+       enddo
+ 
+       if(.not.any(isOpt_orbs)) then
+          write(LOUT,'(a)') 'No orbital exponents to optimize!'
+          stop
+       endif
+ 
+    endif
+ endif
+
+
 ! if(optimize) then
 !    if(post_SCF) then
 ! 
@@ -262,13 +305,11 @@ integer :: i,j,k
 !    isUsed(:) = (isUsed_pairs.and..not.isOpt_pairs)
 !    isUsed(:) = (isUsed_orbs.or.isUsed)
  else
-! hapka: SCFOpt to do later!
-!    isUsed(:) = (isUsed_orbs.and..not.isOpt_orbs)
     do i=1,Nexp_orig
-       isUsed(i) = any(isUsed_orbs(i,:))
-       !isUsed(:) = (isUsed_orbs(:,1).or.isUsed_orbs(:,2))
+       isUsed(i) = (any(isUsed_orbs(i,:)).and..not.isOpt_orbs(i))
     enddo
  endif
+
 
 ! hapka: old_drake
 ! if(post_SCF) then
@@ -277,6 +318,8 @@ integer :: i,j,k
 ! else
 !    isUsed(:) = (isUsed_orbs.and..not.isOpt_orbs)
 ! endif
+
+! if(optimize) skip checking exponents
  written = .false.
  do j=2,Nexp_orig
     do i=1,j-1
@@ -296,8 +339,14 @@ integer :: i,j,k
  enddo
  if(written) stop
 
-! hapka - post SCF to be done later
+! hapka: old_drake 
 ! isUsed(:) = (isUsed_orbs.or.isUsed_pairs)
+
+! set isUsed
+ do i=1,Nexp_orig
+    isUsed(i) = any(isUsed_orbs(i,:))
+ enddo
+
  Nexp = count(isUsed)
  
  if(Nexp/=Nexp_orig) then
@@ -345,7 +394,7 @@ integer :: i,j,k
        System%exponents(i)    = Input%exponents(j)
 !       System%isUsed_orbs(i)  = isUsed_orbs(j)
 !       System%isUsed_pairs(i) = isUsed_pairs(j)
-!       System%isOpt_orbs(i)   = isOpt_orbs(j)
+       System%isOpt_orbs(i)   = isOpt_orbs(j)
 !       System%isOpt_pairs(i)  = isOpt_pairs(i)
 ! 
        exp_reorder(j) = i
@@ -353,6 +402,7 @@ integer :: i,j,k
        exp_reorder(j) = -1
     endif
  enddo
+
 
  if(i/=System%Nexp) then
     write(LOUT,'(a)') 'ERROR!!! Wrong number of exponents in create_System!'
@@ -368,10 +418,9 @@ integer :: i,j,k
        endif
     enddo
  enddo
-
  
 ! call mem_dealloc(isOpt_pairs)
-! call mem_dealloc(isOpt_orbs)
+ call mem_dealloc(isOpt_orbs)
  call mem_dealloc(isUsed)
 ! call mem_dealloc(isUsed_pairs)
  call mem_dealloc(isUsed_orbs)
@@ -464,8 +513,6 @@ integer :: i,j,k
  call sort_prim(sumprim_orbs,prim_all,diff_all,compare_prim_orbs)
  !call reduce_prim(sumprim_orbs,prim_all,diff_all)
  call reduce_prim_l(sumprim_orbs,prim_all,diff_all)
-! prim_all(1,3)=1
-! prim_all(3,3)=2
  call sort_prim(sumprim_orbs,prim_all,diff_l,compare_prim_orbs_l)
 ! write(*,*) 'prim_all(1,:) ', prim_all(1,1:sumprim_orbs)
 ! write(*,*) 'prim_all(2,:) ', prim_all(2,1:sumprim_orbs)
