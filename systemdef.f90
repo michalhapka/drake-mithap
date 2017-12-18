@@ -87,25 +87,26 @@ integer :: i,j,k
 !    stop
 ! end select
 !
-! hapka: post_SCF (to be done later) 
-! if(post_SCF) then
-!    select case(trim(Input%pairs_basis))
-!    case('COMMON')
-!       common_pairs = .true.
-!       n_pairs = 1
-!    case('SEPARATE')
+! hapka: post_SCF 
+ if(post_SCF) then
+    select case(trim(Input%pairs_basis))
+    case('COMMON')
+       common_pairs = .true.
+       n_pairs = 1
+    case('SEPARATE')
+       write(LOUT,'(a)') 'SEPARATE N/A'
 !       common_pairs = .false.
 !       n_pairs = Input%norb
-!    case default
-!       write(LOUT,'(a)') 'Unrecognizable type of pairs basis set: &
-!            &creating system data!'
-!       stop
-!    end select
-! else
-!    common_pairs = .true.
-!    n_pairs = 0
-! endif
-! 
+    case default
+       write(LOUT,'(a)') 'Unrecognizable type of pairs basis set: &
+            &creating system data!'
+       stop
+    end select
+ else
+    common_pairs = .true.
+    n_pairs = 0
+ endif
+ 
  if(post_SCF) then
     if(optimize) then
        if(Input%Neta>1) then

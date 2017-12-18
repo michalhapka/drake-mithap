@@ -6,6 +6,7 @@ implicit none
 
 private
 public possible_calc_type,possible_basis,possible_mult,possible_int3
+public possible_generators
 public print_EndSection
 public InputData,OrbInputData,PairInputData,init_Input,free_Input,print_Input
 public print_orb_control,print_pair_control,compare_prim_orbs,compare_prim_pairs
@@ -48,6 +49,9 @@ character(*),parameter :: possible_calc_type(*) = &
 character(*),parameter :: possible_basis(2) = &
      [character(8) :: 'COMMON', 'SEPARATE']
 
+character(*),parameter :: possible_generators(5) = &
+     [character(8) :: 'S^E', 'P^E', 'P^O', 'D^E(1)', 'D^E(2)']
+
 character(*),parameter :: possible_mult(-1:3) = &
      [character(8) :: 'UNDEF', 'ALL', 'SINGLET', 'BOTH', 'TRIPLET']
 
@@ -69,6 +73,11 @@ integer :: Nprimitives
 integer,allocatable :: pair_control(:,:)
 end type PairInputData
 
+type PairInputData_G
+type(PairInputData),allocatable :: PairInput(:,:)
+character(8) :: gen_type
+end type PairInputData_G
+
 type InputData
 real(prec) :: nucZ
 integer, allocatable :: norb(:)
@@ -84,7 +93,8 @@ character(8) :: orbs_basis
 !type(OrbInputData),allocatable :: OrbInput(:)
 type(OrbInputData_L),allocatable :: OrbInput_L(:)
 character(8) :: pairs_basis
-type(PairInputData),allocatable :: PairInput(:,:)
+!type(PairInputData),allocatable :: PairInput(:,:)
+type(PairInputData_G),allocatable :: PairInput_G(:)
 character  :: INT3;        logical :: set_INT3
 integer    :: LPRINT;      logical :: set_LPRINT
 real(prec) :: SIMTHR;      logical :: set_SIMTHR
@@ -268,18 +278,36 @@ end subroutine init_Input
 subroutine free_Input(Input)
 implicit none
 type(InputData) :: Input
-integer :: i,j
+integer :: i,j,k
 
-if(allocated(Input%PairInput)) then
 
-   do j=1,size(Input%PairInput,2)
-      do i=1,size(Input%PairInput,1)
-         call mem_dealloc(Input%PairInput(i,j)%pair_control)
-      enddo
+! hapka-PairInput
+if(allocated(Input%PairInput_G)) then
+  do k=1,size(Input%PairInput_G)
+
+     if(allocated(Input%PairInput_G(k)%PairInput)) then
+
+        do j=1,size(Input%PairInput_G(k)%PairInput,2)
+           do i=1,size(Input%PairInput_G(k)%PairInput,1)
+              call mem_dealloc(Input%PairInput_G(k)%PairInput(i,j)%pair_control)
+           enddo
+        enddo
+        deallocate(Input%PairInput_G(k)%PairInput)
+     endif 
+
    enddo
-   deallocate(Input%PairInput)
-
 endif
+
+!if(allocated(Input%PairInput)) then
+!
+!   do j=1,size(Input%PairInput,2)
+!      do i=1,size(Input%PairInput,1)
+!         call mem_dealloc(Input%PairInput(i,j)%pair_control)
+!      enddo
+!   enddo
+!   deallocate(Input%PairInput)
+!
+!endif
 
 ! hapka-OrbInput
 if(allocated(Input%OrbInput_L)) then
@@ -293,8 +321,8 @@ if(allocated(Input%OrbInput_L)) then
         deallocate(Input%OrbInput_L(j)%OrbInput)
 
      endif
-  enddo 
 
+  enddo 
 endif
 
 !if(allocated(Input%OrbInput)) then
@@ -403,41 +431,51 @@ if(index(Input%calc_type,'SCF')==0) then
    select case(trim(Input%pairs_basis))
    case('COMMON')
 
-      associate(PairInput => Input%PairInput(1,1))
+do  i=1,size(Input%PairInput_G)
+      write(LOUT,'(2a)') 'GENERATOR  = ',Input%PairInput_G(i)%gen_type
+      associate(PairInput => Input%PairInput_G(i)%PairInput(1,1))
         call print_pair_control(PairInput%Nprimitives,&
              PairInput%pair_control)
       end associate
+enddo
+
+!      associate(PairInput => Input%PairInput(1,1))
+!        call print_pair_control(PairInput%Nprimitives,&
+!             PairInput%pair_control)
+!      end associate
+
 
    case('SEPARATE')
 ! hapka-norb
-do k=1,Input%maxl+1
-      do j=1,Input%norb(k)
-         do i=1,j
-
-            idx1 = j
-            idx2 = i
-            do
-               associate(PairInput => Input%PairInput(idx1,idx2))
-                 if(PairInput%mult>0) then
-                    write(LOUT,'(2(a,i3),3a)',advance='no') &
-                         'PAIR = ',i,', ',j,&
-                         ', MULT = ',trim(possible_mult(PairInput%mult)),', '
-                    call print_pair_control(PairInput%Nprimitives,&
-                         PairInput%pair_control)
-                 elseif(PairInput%mult==0) then
-                    write(LOUT,'(a)') 'ERROR!!! &
-                         &Wrong multiplicity for SEPARATE pair basis set!'
-                    stop
-                 endif
-               end associate
-
-               if(idx1<=idx2) exit
-               call swap(idx1,idx2)
-            enddo
-
-         enddo
-      enddo
-enddo
+      write(LOUT,*) 'SEPARATE case not used!'
+!do k=1,Input%maxl+1
+!      do j=1,Input%norb(k)
+!         do i=1,j
+!
+!            idx1 = j
+!            idx2 = i
+!            do
+!               associate(PairInput => Input%PairInput(idx1,idx2))
+!                 if(PairInput%mult>0) then
+!                    write(LOUT,'(2(a,i3),3a)',advance='no') &
+!                         'PAIR = ',i,', ',j,&
+!                         ', MULT = ',trim(possible_mult(PairInput%mult)),', '
+!                    call print_pair_control(PairInput%Nprimitives,&
+!                         PairInput%pair_control)
+!                 elseif(PairInput%mult==0) then
+!                    write(LOUT,'(a)') 'ERROR!!! &
+!                         &Wrong multiplicity for SEPARATE pair basis set!'
+!                    stop
+!                 endif
+!               end associate
+!
+!               if(idx1<=idx2) exit
+!               call swap(idx1,idx2)
+!            enddo
+!
+!         enddo
+!      enddo
+!enddo
 
    case default
 

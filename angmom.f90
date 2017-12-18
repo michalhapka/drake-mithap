@@ -4,6 +4,7 @@ implicit none
 
 private
 public get_angmom_name,get_angmom_l
+public get_gen_n,get_gen_name
 
 contains
 
@@ -108,5 +109,48 @@ write(LOUT,'(2a)') 'Incorrect symbol of angular momentum: ',name
 stop
 end select
 end function get_angmom_l
+
+function get_gen_n(name) result(n)
+implicit none
+integer :: n
+character(*),intent(in) :: name
+select case(trim(name))
+case('S^E')
+n=1
+case('P^E')
+n=2
+case('P^O')
+n=3
+case('D^E(1)')
+n=4
+case('D^E(2)')
+n=5
+case default
+write(LOUT,'(2a)') 'Incorrect generator symbol : ',name
+stop
+end select
+end function get_gen_n
+
+function get_gen_name(n) result(name)
+implicit none
+character(3) :: name
+integer,intent(in) :: n
+select case(n)
+case(1)
+name='S^E'
+case(2)
+name='P^E'
+case(3)
+name='P^0'
+case(4)
+name='D^E(1)'
+case(5)
+name='D^E(2)'
+case default
+write(LOUT,'(a,i3)') 'Incorrect generator number: ',n
+stop
+end select
+end function get_gen_name
+
 
 end module angmom

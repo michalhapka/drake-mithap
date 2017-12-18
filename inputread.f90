@@ -54,9 +54,12 @@ type(InputData) :: Input
 character(slength) :: line,keyword
 integer :: icnt,iorb,ipair1,ipair2,imult
 integer :: i,j
+integer :: itmp, gen_num
 logical :: swapped
 character(8) :: smult, lorb_tmp
+character(8) :: gen_tmp
 logical,allocatable :: isOrb(:),isPair(:,:)
+logical,allocatable :: given(:)
 
 call read_line(line)
 call read_keyword_and_advance_line(line,'Z','=')
@@ -294,28 +297,81 @@ if(trim(keyword).eq.'LORB') then
    call incorrect_data  
 endif
 
-! hapka: post HF part (to be done later)
-!if(index(Input%calc_type,'SCF')==0) then
+! hapka: post HF part 
+if(index(Input%calc_type,'SCF')==0) then
    
- !  call read_line(line)
- !  call read_keyword_and_advance_line(line,'PAIRS','=')
- !  call read_value_and_advance_line(line,Input%pairs_basis,end_flag)
- !  if(all(trim(Input%pairs_basis)/=possible_basis)) then
- !     write(LOUT,'(a)') 'Unrecognizable type of pairs basis set! Choose one of:'
- !     write(LOUT,'(a)') possible_basis
- !     call incorrect_data
- !  endif
+   call read_line(line)
+   call read_keyword_and_advance_line(line,'PAIRS','=')
+   call read_value_and_advance_line(line,Input%pairs_basis,end_flag)
+   if(all(trim(Input%pairs_basis)/=possible_basis)) then
+      write(LOUT,'(a)') 'Unrecognizable type of pairs basis set! Choose one of:'
+      write(LOUT,'(a)') possible_basis
+      call incorrect_data
+   endif
 
-!   select case(trim(Input%pairs_basis))
-!   case('COMMON')
+   select case(trim(Input%pairs_basis))
+   case('COMMON')
+
+      if(Input%maxl.eq.0) then
+        gen_num = 1 
+      else
+        gen_num = 5 
+      endif
+      ! hapka: maxl>1 not implemented!!!
+      allocate(Input%PairInput_G(gen_num))
+      allocate(given(gen_num))
+      
+      given = .false.
+      do i=1,gen_num
+
+         call read_line(line)
+         if(check_keyword(line,'END',end_flag)) then
+           write(LOUT,'(a,i3,2x,a,i3,2x,a)') 'For maxl =', Input%maxl, 'expected', &
+                                              gen_num, 'pair generators!'
+           do j=1,gen_num
+              if(.not.given(j)) write(LOUT,'(a)') 'Missing ' // get_gen_name(j) // ' generator!'
+           enddo
+           call incorrect_data
+         endif 
+
+         call read_keyword_and_advance_line(line,'GENERATOR','=')
+         call read_value_and_advance_line(line,gen_tmp,end_flag)
+         if(all(trim(gen_tmp)/=possible_generators)) then
+            write(LOUT,'(a)') 'Unrecognizable type of generator! Choose one of:'
+            write(LOUT,'(a)') possible_generators
+            call incorrect_data
+         endif
+
+         itmp = get_gen_n(trim(gen_tmp))
+         if(given(itmp)) then
+            write(LOUT,'(a)') 'Generator ' // trim(gen_tmp) // ' allocated twice!'
+            call incorrect_data
+         else
+            given(itmp) = .true. 
+         endif
+         allocate(Input%PairInput_G(itmp)%PairInput(1,1))
+         associate(PairInput => Input%PairInput_G(itmp)%PairInput(1,1))
+            PairInput%mult = 0 
+            Input%PairInput_G(itmp)%gen_type=trim(gen_tmp)  
+ 
+            call read_line(line)
+            call read_PairInput(PairInput, &
+                                Input%PairInput_G(itmp)%gen_type)
+         end associate 
+      enddo 
+      
+! hapka: old_drake
+!         allocate(Input%PairInput(1,1))
 !
-!      allocate(Input%PairInput(1,1))
-!
-!      Input%PairInput(1,1)%mult = 0
-!      call read_line(line)
-!      call read_PairInput(Input%PairInput(1,1))
-!
-!   case('SEPARATE')
+!         Input%PairInput(1,1)%mult = 0
+!         call read_line(line)
+!         call read_keyword_and_advance_line(line,'GENERATOR','=')
+!         call read_value_and_advance_line(line,gen_tmp,end_flag)
+!   
+!         call read_line(line)
+!         call read_PairInput(Input%PairInput(1,1))
+
+   case('SEPARATE')
 !
 !      allocate(Input%PairInput(Input%norb,Input%norb))
 !
@@ -435,34 +491,44 @@ endif
 !      enddo
 !      call mem_dealloc(isPair)
 !
-!   case default
-!
-!      write(LOUT,'(a)') 'Unrecognizable type of pairs basis set: &
-!           &reading inputfile!'
-!      stop
-!
-!   end select
-!
-!   call read_line(line)
-!   call read_keyword_and_advance_line(line,'END',end_flag)
-!
-!else
-!
-!   call read_line(line)
-!   if(check_keyword(line,'PAIRS','=')) then
-!
-!      do
-!         call read_line(line)
-!         if(check_keyword(line,'END',end_flag)) exit
-!      enddo
-!
-!   else
-!
-!      call cancel_line
-!
-!   endif
-!
-!endif
+   case default
+
+      write(LOUT,'(a)') 'Unrecognizable type of pairs basis set: &
+           &reading inputfile!'
+      stop
+
+   end select
+
+
+   call read_line(line)
+   call get_keyword_and_advance_line(line,keyword,'=')
+   if(trim(keyword).eq.'GENERATOR') then
+      write(LOUT,'(a)') 'Too many generator blocks!'
+      call incorrect_data
+   else 
+      call cancel_line
+   endif
+
+   call read_line(line)
+   call read_keyword_and_advance_line(line,'END',end_flag)
+
+else
+
+   call read_line(line)
+   if(check_keyword(line,'PAIRS','=')) then
+
+      do
+         call read_line(line)
+         if(check_keyword(line,'END',end_flag)) exit
+      enddo
+
+   else
+
+      call cancel_line
+
+   endif
+
+endif
 
 do
    call read_line(line)
@@ -658,59 +724,62 @@ contains
 !
 !  end subroutine fake_PairInput
 !
-!  subroutine read_PairInput(PairInput)
-!  implicit none
-!  type(PairInputData) :: PairInput
-!  integer :: iexp(2),itype,irange(3)
-!  integer :: i,j
-!
-!  call read_keyword_and_advance_line(line,'PRIMITIVES','=')
-!  call read_value_and_advance_line(line,PairInput%Nprimitives,end_flag)
-!  if(PairInput%Nprimitives<0) then
-!     write(LOUT,'(a)') 'Incorrect number of pair primitives!'
-!     call incorrect_data
-!  endif
-!
-!  call mem_alloc(PairInput%pair_control,6,PairInput%Nprimitives)
-!  PairInput%pair_control = 0
-!
-!  do i=1,PairInput%Nprimitives
-!     call read_line(line)
-!
-!     call read_value_and_advance_line(line,iexp(1),',',.false.)
-!     call read_value_and_advance_line(line,iexp(2),'|')
-!     if(any(iexp<1).or.any(iexp>Input%Nexponents)) then
-!        write(LOUT,'(a)') 'At least one of the exponents does not exist!'
-!        call incorrect_data
-!     endif
-!
-!     call read_value_and_advance_line(line,itype,':')
-!     if(itype<1.or.itype>3) then
-!        write(LOUT,'(a)') &
-!             'Incorrect range type specification in the definition of pair!'
-!        call incorrect_data
-!     endif
-!
-!     do j=1,itype-1
-!        call read_value_and_advance_line(line,irange(j),',',.false.)
-!     enddo
-!     call read_value_and_advance_line(line,irange(itype),end_flag)
-!     if(any(irange(1:itype)<0)) then
-!        write(LOUT,'(a)') 'Incorrect r-range in the definition of pair!'
-!        call incorrect_data
-!     endif
-!
-!     if(iexp(1)>iexp(2)) then
-!        call swap(iexp(1),iexp(2))
-!        if(itype>2) call swap(irange(1),irange(2))
-!     endif
-!
-!     PairInput%pair_control(1:2,i) = iexp
-!     PairInput%pair_control(3,i) = itype
-!     PairInput%pair_control(4:3+itype,i) = irange(1:itype)
-!  enddo
-!
-!  end subroutine read_PairInput
+  subroutine read_PairInput(PairInput,gentype)
+  implicit none
+  type(PairInputData) :: PairInput
+  character(8) :: gentype
+  integer :: iexp(2),itype,irange(3)
+  integer :: i,j
+
+  call read_keyword_and_advance_line(line,'PRIMITIVES','=')
+  call read_value_and_advance_line(line,PairInput%Nprimitives,end_flag)
+  if(PairInput%Nprimitives<0) then
+     write(LOUT,'(a)') 'Incorrect number of pair primitives!'
+     call incorrect_data
+  endif
+
+  call mem_alloc(PairInput%pair_control,6,PairInput%Nprimitives)
+  PairInput%pair_control = 0
+
+  do i=1,PairInput%Nprimitives
+     call read_line(line)
+
+     call read_value_and_advance_line(line,iexp(1),',',.false.)
+     call read_value_and_advance_line(line,iexp(2),'|')
+     if(any(iexp<1).or.any(iexp>Input%Nexponents)) then
+        write(LOUT,'(a)') 'At least one of the exponents does not exist!'
+        call incorrect_data
+     endif
+
+     call read_value_and_advance_line(line,itype,':')
+     if(itype<1.or.itype>3) then
+        write(LOUT,'(a)') &
+             'Incorrect range type specification in the definition of pair!'
+        call incorrect_data
+     endif
+
+     do j=1,itype-1
+        call read_value_and_advance_line(line,irange(j),',',.false.)
+     enddo
+     call read_value_and_advance_line(line,irange(itype),end_flag)
+     if(any(irange(1:itype)<0)) then
+        write(LOUT,'(a)') 'Incorrect r-range in the definition of pair!'
+        call incorrect_data
+     endif
+   
+     if ((gentype.eq.'S^E').or.(gentype.eq.'P^E').or.(gentype.eq.'D^E(1)')) then
+          if(iexp(1)>iexp(2)) then
+             call swap(iexp(1),iexp(2))
+             if(itype>2) call swap(irange(1),irange(2))
+          endif
+     endif
+
+     PairInput%pair_control(1:2,i) = iexp
+     PairInput%pair_control(3,i) = itype
+     PairInput%pair_control(4:3+itype,i) = irange(1:itype)
+  enddo
+
+  end subroutine read_PairInput
 
 end subroutine read_InputFile
 
