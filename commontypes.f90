@@ -178,6 +178,11 @@ integer :: n_prim
 type(PairSpecData),allocatable :: PairSpec(:)
 end type PairSystemData
 
+type PairSystemData_G
+type(PairSystemData),allocatable :: PairSystem(:,:)
+character(8) :: gen_type
+end type PairSystemData_G
+
 type PairReducedData
 logical :: isUsed
 integer :: iexp1,iexp2,iexpSQ
@@ -201,17 +206,19 @@ logical :: common_orbs,common_pairs
 integer,allocatable :: n_orbs(:)
 integer :: n_pairs
 integer :: Neta
+integer :: GenNum
 integer,allocatable :: eta(:)
 integer :: Nexp,NexpSQ
 real(prec),allocatable :: exponents(:)
 !logical,allocatable :: isUsed_orbs(:),isUsed_pairs(:)
-logical,allocatable :: isUsed_pairs(:)
+logical,allocatable :: isUsed_pairs(:,:)
 logical,allocatable :: isUsed_orbs(:,:)
 logical,allocatable :: isOpt_orbs(:) ,isOpt_pairs(:)
 type(OrbSystemData_L),allocatable :: OrbSystem_L(:)
 !type(OrbSystemData),allocatable :: OrbSystem(:)
 type(OrbReducedData),allocatable :: OrbReduced(:)
-type(PairSystemData),allocatable :: PairSystem(:,:)
+type(PairSystemData_G),allocatable :: PairSystem_G(:)
+!type(PairSystemData),allocatable :: PairSystem(:,:)
 type(PairReducedData),allocatable :: PairReduced(:),OrbPairReduced(:)
 end type SystemData
 
@@ -779,15 +786,18 @@ end subroutine fill_Control
 subroutine init_System(System)
 implicit none
 type(SystemData) :: System
-integer :: i,j
+integer :: i,j,k
 
 call mem_alloc(System%eta         ,System%Neta)
 call mem_alloc(System%exponents   ,System%Nexp)
-!call mem_alloc(System%isUsed_orbs ,System%Nexp)
 call mem_alloc(System%isUsed_orbs ,System%Nexp, System%maxl+1)
-call mem_alloc(System%isUsed_pairs,System%Nexp)
+call mem_alloc(System%isUsed_pairs,System%Nexp, System%GenNum)
 call mem_alloc(System%isOpt_orbs  ,System%Nexp)
 call mem_alloc(System%isOpt_pairs ,System%Nexp)
+
+! hapka: old_drake
+!call mem_alloc(System%isUsed_orbs ,System%Nexp)
+!call mem_alloc(System%isUsed_pairs,System%Nexp)
 !call mem_alloc(System%norb        ,System%maxl+1)
 !call mem_alloc(System%n_orbs      ,System%maxl+1)
   
@@ -812,9 +822,26 @@ call mem_alloc(System%isOpt_pairs ,System%Nexp)
   do i=1,System%Nexp
      call init_OrbReduced(System%OrbReduced(i))
   enddo
- ! 
- ! if(System%post_SCF) then
- ! 
+  
+  if(System%post_SCF) then
+  
+     allocate(System%PairSystem_G(System%GenNum))
+     do i=1,System%GenNum
+        allocate(System%PairSystem_G(i)%PairSystem(System%n_pairs,System%n_pairs))
+     enddo
+
+ !    allocate(System%PairReduced(System%NexpSQ))
+ !    allocate(System%OrbPairReduced(System%NexpSQ))
+ !
+     do k=1,System%GenNum
+        do j=1,System%n_pairs
+           do i=1,System%n_pairs
+              call init_PairSystem(System%PairSystem_G(k)%PairSystem(i,j))
+           enddo
+        enddo
+     enddo
+
+ ! hapka: old_drake
  !    allocate(System%PairSystem(System%n_pairs,System%n_pairs))
  !    allocate(System%PairReduced(System%NexpSQ))
  !    allocate(System%OrbPairReduced(System%NexpSQ))
@@ -832,16 +859,16 @@ call mem_alloc(System%isOpt_pairs ,System%Nexp)
  !       call init_PairReduced(System%OrbPairReduced(i))
  !    enddo
  ! 
- ! endif
+  endif
 
 end subroutine init_System
 
 subroutine free_System(System)
 implicit none
 type(SystemData) :: System
-integer :: i,j
+integer :: i,j,k
 
-!if(System%post_SCF) then
+if(System%post_SCF) then
 !
 !   do i=1,System%NexpSQ
 !      call free_PairReduced(System%OrbPairReduced(i))
@@ -850,6 +877,15 @@ integer :: i,j
 !      call free_PairReduced(System%PairReduced(i))
 !   enddo
 !
+
+   do k=1,System%GenNum
+      do j=1,System%n_pairs
+         do i=1,System%n_pairs
+            call free_PairSystem(System%PairSystem_G(k)%PairSystem(i,j))
+         enddo
+      enddo
+   enddo
+
 !   do j=1,System%n_pairs
 !      do i=1,System%n_pairs
 !         call free_PairSystem(System%PairSystem(i,j))
@@ -859,8 +895,9 @@ integer :: i,j
 !   deallocate(System%OrbPairReduced)
 !   deallocate(System%PairReduced)
 !   deallocate(System%PairSystem)
-!
-!endif
+   deallocate(System%PairSystem_G)
+
+endif
 !
 ! OrbSpece!
 !do j=1,System%maxl+1
@@ -1711,43 +1748,44 @@ if(System%post_SCF) then
    else
       write(LOUT,'(a)') 'SEPARATE'
    endif
-   do j=1,System%n_pairs
-      do i=1,j
+   write(LOUT,'(a)') 'FIX print_System!'
+!   do j=1,System%n_pairs
+!      do i=1,j
+!
+!         idx1 = j
+!         idx2 = i
+!         do
+!            associate(PairSystem => System%PairSystem(idx1,idx2))
+!              if(PairSystem%mult>=0) then
+!                 write(LOUT,'()')
+!                 if(.not.System%common_pairs) &
+!                      write(LOUT,'(a,2(i3,a),a)') &
+!                      'pair no. ',i,', ',j,', ',possible_mult(PairSystem%mult)
+!                 call print_PairSystem(PairSystem,LPRINT)
+!              endif
+!            end associate
+!
+!            if(idx1<=idx2) exit
+!            call swap(idx1,idx2)
+!         enddo
+!
+!      enddo
+!   enddo
 
-         idx1 = j
-         idx2 = i
-         do
-            associate(PairSystem => System%PairSystem(idx1,idx2))
-              if(PairSystem%mult>=0) then
-                 write(LOUT,'()')
-                 if(.not.System%common_pairs) &
-                      write(LOUT,'(a,2(i3,a),a)') &
-                      'pair no. ',i,', ',j,', ',possible_mult(PairSystem%mult)
-                 call print_PairSystem(PairSystem,LPRINT)
-              endif
-            end associate
-
-            if(idx1<=idx2) exit
-            call swap(idx1,idx2)
-         enddo
-
-      enddo
-   enddo
-
-   if(LPRINT>=5) then
-
-      write(LOUT,'()')
-      write(LOUT,'(a)') 'reduced pair information'
-      write(LOUT,'()')
-      write(LOUT,'(11x,a,4x,a,1x,a,t40,a,11x,a,4x,a,1x,a)') &
-           'no.','exps','(expSQ)','||','no.','exps','(expSQ)'
-      do i=1,System%NexpSQ
-         call print_two_PairReduced(i,&
-              System%OrbPairReduced(i),System%PairReduced(i))
-         if(i/=System%NexpSQ) write(LOUT,'(t40,a)') '||'
-      enddo
-
-   endif
+!   if(LPRINT>=5) then
+!
+!      write(LOUT,'()')
+!      write(LOUT,'(a)') 'reduced pair information'
+!      write(LOUT,'()')
+!      write(LOUT,'(11x,a,4x,a,1x,a,t40,a,11x,a,4x,a,1x,a)') &
+!           'no.','exps','(expSQ)','||','no.','exps','(expSQ)'
+!      do i=1,System%NexpSQ
+!         call print_two_PairReduced(i,&
+!              System%OrbPairReduced(i),System%PairReduced(i))
+!         if(i/=System%NexpSQ) write(LOUT,'(t40,a)') '||'
+!      enddo
+!
+!   endif
 
 endif
 

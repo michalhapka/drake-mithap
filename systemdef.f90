@@ -25,8 +25,9 @@ integer :: sumprim_orbs,sumprim_pairs
 integer :: nprim_orbs,nprim_pairs
 integer :: Neta
 integer :: Nexp_orig,Nexp
+integer :: GenNum
 logical,allocatable :: isUsed_orbs(:,:)
-logical,allocatable :: isUsed_pairs(:),isUsed(:)
+logical,allocatable :: isUsed_pairs(:,:),isUsed(:)
 !logical,allocatable :: isUsed_orbs(:),isUsed_pairs(:),isUsed(:)
 logical,allocatable :: isOpt_orbs(:)
 logical,allocatable :: isOpt_pairs(:)
@@ -38,7 +39,7 @@ integer,allocatable :: diff_l(:)
 logical,allocatable :: expSQ_restrict(:)
 character(2) :: sepspace
 logical :: written
-integer :: i,j,k
+integer :: i,j,k,l
 
  post_SCF = (index(Input%calc_type,'SCF')==0)
  optimize = (index(Input%calc_type,'OPT')/=0)
@@ -126,11 +127,18 @@ integer :: i,j,k
  
  call mem_alloc(exp_reorder,Nexp_orig)
 
+ if(Input%maxl.eq.0) then
+    GenNum = 1
+ else 
+    GenNum = 5
+ ! hapka: maxl>1 not implemented!
+ endif 
+
  call mem_alloc(isUsed_orbs ,Nexp_orig, Input%maxl+1)
-! call mem_alloc(isUsed_pairs,Nexp_orig)
+ call mem_alloc(isUsed_pairs,Nexp_orig, GenNum)
  call mem_alloc(isUsed      ,Nexp_orig)
  call mem_alloc(isOpt_orbs  ,Nexp_orig)
-! call mem_alloc(isOpt_pairs ,Nexp_orig)
+ call mem_alloc(isOpt_pairs ,Nexp_orig)
 
 ! hapka: old_drake 
 ! call mem_alloc(isUsed_orbs ,Nexp_orig)
@@ -164,6 +172,11 @@ integer :: i,j,k
     enddo
  enddo
 
+
+! hapka: old_drake
+! maxprim_orbs = 0
+! sumprim_orbs = 0
+
 ! hapka: old_drake
 ! maxprim_orbs = 0
 ! sumprim_orbs = 0
@@ -187,6 +200,39 @@ integer :: i,j,k
 !    end associate
 ! enddo
 ! 
+
+ maxprim_pairs = 0
+ sumprim_pairs = 0
+ isUsed_pairs  = .false.
+ if(post_SCF) then
+    do l=1,GenNum
+       do k=1,n_pairs
+          do j=1,n_pairs
+             associate(PairInput => Input%PairInput_G(l)%PairInput(j,k))
+ 
+               if(PairInput%mult<0) cycle
+ 
+               nprim_pairs = PairInput%Nprimitives
+ 
+               maxprim_pairs = max(maxprim_pairs,nprim_pairs)
+               sumprim_pairs = sumprim_pairs + nprim_pairs
+ 
+               do i=1,nprim_pairs
+                  isUsed_pairs(PairInput%pair_control(1,i),l) = .true.
+                  isUsed_pairs(PairInput%pair_control(2,i),l) = .true.
+               enddo
+ 
+             end associate
+          enddo
+       enddo
+    enddo
+    if(maxprim_pairs<1) then
+       write(LOUT,'(a)') 'At least one pair should be specified!'
+       stop
+    endif
+ endif
+
+! hapka: old_drake
 ! maxprim_pairs = 0
 ! sumprim_pairs = 0
 ! isUsed_pairs  = .false.
@@ -216,37 +262,41 @@ integer :: i,j,k
 !    endif
 ! endif
 ! 
-! isOpt_orbs  = .false.
-! isOpt_pairs = .false.
 
+ isOpt_orbs  = .false.
+ isOpt_pairs = .false.
 
  if(optimize) then
     if(post_SCF) then
 
-       write(LOUT,'(a)') 'Post SCF not ready!'
+       do i=1,Nexp_orig
+          isOpt_pairs(i) = (any(isUsed_pairs(i,:)).and.Input%optimized(i))
+       enddo
  
-  !     isOpt_pairs(:) = (isUsed_pairs.and.Input%optimized)
- 
-  !     if(.not.any(isOpt_pairs)) then
-  !        write(LOUT,'(a)') 'No pair exponents to optimize!'
-  !        stop
-  !     endif
- 
-  !     isUsed(:) = (isUsed_orbs.and.isOpt_pairs)
-  !     if(any(isUsed)) then
-  !        write(LOUT,'()')
-  !        write(LOUT,'(a)',advance='no') 'Some orbital and &
-  !             &optimized pair exponents overlap'
-  !        sepspace = ': '
-  !        do i=1,Nexp_orig
-  !           if(isUsed(i)) then
-  !              write(LOUT,'(a,i3)',advance='no') sepspace,i
-  !              sepspace = ', '
-  !           endif
-  !        enddo
-  !        write(LOUT,'()')
-  !        stop
-  !     endif
+       if(.not.any(isOpt_pairs)) then
+          write(LOUT,'(a)') 'No pair exponents to optimize!'
+          stop
+       endif
+
+       !isUsed(:) = (isUsed_orbs.and.isOpt_pairs)
+       do i=1,Nexp_orig
+          isUsed(i) = (any(isUsed_orbs(i,:)).and.isOpt_pairs(i)) 
+       enddo
+
+       if(any(isUsed)) then
+          write(LOUT,'()')
+          write(LOUT,'(a)',advance='no') 'Some orbital and &
+               &optimized pair exponents overlap'
+          sepspace = ': '
+          do i=1,Nexp_orig
+             if(isUsed(i)) then
+                write(LOUT,'(a,i3)',advance='no') sepspace,i
+                sepspace = ', '
+             endif
+          enddo
+          write(LOUT,'()')
+          stop
+       endif
  
     else
        do i=1,Nexp_orig 
@@ -260,7 +310,6 @@ integer :: i,j,k
  
     endif
  endif
-
 
 ! if(optimize) then
 !    if(post_SCF) then
@@ -302,9 +351,12 @@ integer :: i,j,k
 ! 
 
  if(post_SCF) then
-     write(LOUT,'(a)') 'Post SCF not ready!'
-!    isUsed(:) = (isUsed_pairs.and..not.isOpt_pairs)
-!    isUsed(:) = (isUsed_orbs.or.isUsed)
+    do i=1,Nexp_orig
+       isUsed(i) = (any(isUsed_pairs(i,:)).and..not.isOpt_pairs(i))
+    enddo
+    do i=1,Nexp_orig
+       isUsed(i) = any(isUsed_orbs(i,:)).or.isUsed(i)
+    enddo
  else
     do i=1,Nexp_orig
        isUsed(i) = (any(isUsed_orbs(i,:)).and..not.isOpt_orbs(i))
@@ -345,7 +397,8 @@ integer :: i,j,k
 
 ! set isUsed
  do i=1,Nexp_orig
-    isUsed(i) = any(isUsed_orbs(i,:))
+!   isUsed(i) = any(isUsed_orbs(i,:))
+    isUsed(i) = any(isUsed_orbs(i,:)).or.any(isUsed_pairs(i,:))
  enddo
 
  Nexp = count(isUsed)
@@ -372,8 +425,9 @@ integer :: i,j,k
  System%post_SCF     = post_SCF
  System%optimize     = optimize
  System%common_orbs  = common_orbs
-! System%common_pairs = common_pairs
-! System%n_pairs      = n_pairs
+ System%common_pairs = common_pairs
+ System%n_pairs      = n_pairs
+ System%GenNum       = GenNum
  System%Neta         = Neta
  System%Nexp         = Nexp
  System%NexpSQ       = System%Nexp*(System%Nexp + 1)/2
@@ -393,10 +447,10 @@ integer :: i,j,k
        i = i + 1
  
        System%exponents(i)    = Input%exponents(j)
-!       System%isUsed_orbs(i)  = isUsed_orbs(j)
-!       System%isUsed_pairs(i) = isUsed_pairs(j)
+!      System%isUsed_orbs(i)  = isUsed_orbs(j)
+!      System%isUsed_pairs(i) = isUsed_pairs(j)
        System%isOpt_orbs(i)   = isOpt_orbs(j)
-!       System%isOpt_pairs(i)  = isOpt_pairs(i)
+       System%isOpt_pairs(i)  = isOpt_pairs(i)
 ! 
        exp_reorder(j) = i
     else
@@ -419,11 +473,22 @@ integer :: i,j,k
        endif
     enddo
  enddo
- 
-! call mem_dealloc(isOpt_pairs)
+
+ do k=1,System%GenNum
+ i=0
+    do j=1,Nexp_orig
+       if(isUsed(j)) then
+       i = i+ 1
+       System%isUsed_pairs(i,k) = isUsed_pairs(j,k)
+       endif
+    enddo
+ enddo
+
+
+ call mem_dealloc(isOpt_pairs)
  call mem_dealloc(isOpt_orbs)
  call mem_dealloc(isUsed)
-! call mem_dealloc(isUsed_pairs)
+ call mem_dealloc(isUsed_pairs)
  call mem_dealloc(isUsed_orbs)
 
  call mem_alloc(prim,2,maxprim_orbs)
@@ -607,6 +672,8 @@ integer :: i,j,k
 !       enddo
 !    enddo
 ! 
+! DOTAD TRWALA ANALIZA (Sturm und Drang!)
+!
 !    call sort_prim(sumprim_pairs,prim_all,diff_all,compare_prim_pairs)
 !    call reduce_prim(sumprim_pairs,prim_all,diff_all)
 !    call create_PairReduced(System%PairReduced,&
@@ -830,6 +897,7 @@ integer :: nlang, iexp
 !fill OrbReduced
 off_one=0
 cnt = Nexp 
+write(*,*) Nexp, 'errrror tu!'
 do i=1,cnt
    associate(OrbReduced => OrbReduced(i))
    iexp = prim(1,i+off_one)
