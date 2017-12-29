@@ -11,6 +11,7 @@ public create_System
 contains
 
 subroutine create_System(System,Input,Control)
+use angmom
 implicit none
 type(SystemData) :: System
 type(InputData),intent(in) :: Input
@@ -25,7 +26,7 @@ integer :: sumprim_orbs,sumprim_pairs
 integer :: nprim_orbs,nprim_pairs
 integer :: Neta
 integer :: Nexp_orig,Nexp
-integer :: GenNum
+integer :: NumGen
 logical,allocatable :: isUsed_orbs(:,:)
 logical,allocatable :: isUsed_pairs(:,:),isUsed(:)
 !logical,allocatable :: isUsed_orbs(:),isUsed_pairs(:),isUsed(:)
@@ -36,9 +37,11 @@ integer,allocatable :: exp_reorder(:)
 integer,allocatable :: prim(:,:),prim_all(:,:)
 integer,allocatable :: diff(:),diff_all(:)
 integer,allocatable :: diff_l(:)
-logical,allocatable :: expSQ_restrict(:)
+!logical,allocatable :: expSQ_restrict(:)
+logical,allocatable :: expSQ_restrict(:,:)
 character(2) :: sepspace
 logical :: written
+integer :: order_tmp
 integer :: i,j,k,l
 
  post_SCF = (index(Input%calc_type,'SCF')==0)
@@ -127,15 +130,10 @@ integer :: i,j,k,l
  
  call mem_alloc(exp_reorder,Nexp_orig)
 
- if(Input%maxl.eq.0) then
-    GenNum = 1
- else 
-    GenNum = 5
- ! hapka: maxl>1 not implemented!
- endif 
+ NumGen = get_num_gen(Input%maxl)
 
  call mem_alloc(isUsed_orbs ,Nexp_orig, Input%maxl+1)
- call mem_alloc(isUsed_pairs,Nexp_orig, GenNum)
+ call mem_alloc(isUsed_pairs,Nexp_orig, NumGen)
  call mem_alloc(isUsed      ,Nexp_orig)
  call mem_alloc(isOpt_orbs  ,Nexp_orig)
  call mem_alloc(isOpt_pairs ,Nexp_orig)
@@ -205,7 +203,7 @@ integer :: i,j,k,l
  sumprim_pairs = 0
  isUsed_pairs  = .false.
  if(post_SCF) then
-    do l=1,GenNum
+    do l=1,NumGen
        do k=1,n_pairs
           do j=1,n_pairs
              associate(PairInput => Input%PairInput_G(l)%PairInput(j,k))
@@ -427,7 +425,7 @@ integer :: i,j,k,l
  System%common_orbs  = common_orbs
  System%common_pairs = common_pairs
  System%n_pairs      = n_pairs
- System%GenNum       = GenNum
+ System%NumGen       = NumGen
  System%Neta         = Neta
  System%Nexp         = Nexp
  System%NexpSQ       = System%Nexp*(System%Nexp + 1)/2
@@ -474,7 +472,7 @@ integer :: i,j,k,l
     enddo
  enddo
 
- do k=1,System%GenNum
+ do k=1,System%NumGen
  i=0
     do j=1,Nexp_orig
        if(isUsed(j)) then
@@ -513,7 +511,7 @@ integer :: i,j,k,l
             prim(1,k) = exp_reorder(prim(1,k))
          enddo
     
-         call sort_prim(nprim_orbs,prim,diff,compare_prim_orbs)
+         call sort_prim(nprim_orbs,prim,diff,2,compare_prim_orbs)
          if(any(diff(1:nprim_orbs)>1)) then
             write(LOUT,'(a)') &
                  'ERROR!!! Some of the orbital primitives are redefined!'
@@ -576,10 +574,12 @@ integer :: i,j,k,l
 !    end associate
 ! enddo
 ! 
- call sort_prim(sumprim_orbs,prim_all,diff_all,compare_prim_orbs)
+ call sort_prim(sumprim_orbs,prim_all,diff_all,2,compare_prim_orbs)
  !call reduce_prim(sumprim_orbs,prim_all,diff_all)
- call reduce_prim_l(sumprim_orbs,prim_all,diff_all)
- call sort_prim(sumprim_orbs,prim_all,diff_l,compare_prim_orbs_l)
+ call reduce_prim(sumprim_orbs,prim_all,diff_all,3)
+! call reduce_prim_l(sumprim_orbs,prim_all,diff_all)
+ call sort_prim(sumprim_orbs,prim_all,diff_l,3,compare_prim_orbs)
+! call sort_prim(sumprim_orbs,prim_all,diff_l,compare_prim_orbs_l)
 ! write(*,*) 'prim_all(1,:) ', prim_all(1,1:sumprim_orbs)
 ! write(*,*) 'prim_all(2,:) ', prim_all(2,1:sumprim_orbs)
 ! write(*,*) 'prim_all(3,:) ', prim_all(3,1:sumprim_orbs)
@@ -601,16 +601,85 @@ integer :: i,j,k,l
  call mem_dealloc(diff)
  call mem_dealloc(prim_all)
  call mem_dealloc(prim)
-! 
-! if(System%post_SCF) then
-! 
-!    sumprim_pairs = sumprim_pairs + sumprim_orbs*(sumprim_orbs + 1)/2
-! 
-!    call mem_alloc(prim,6,maxprim_pairs)
-!    call mem_alloc(prim_all,6,sumprim_pairs)
-!    call mem_alloc(diff,maxprim_pairs)
-!    call mem_alloc(diff_all,sumprim_pairs)
-! 
+ 
+ if(System%post_SCF) then
+ 
+    sumprim_pairs = sumprim_pairs + sumprim_orbs**2
+!   sumprim_pairs = sumprim_pairs + sumprim_orbs*(sumprim_orbs + 1)/2
+ 
+    call mem_alloc(prim,6,maxprim_pairs)
+    call mem_alloc(prim_all,7,sumprim_pairs)
+    call mem_alloc(diff,maxprim_pairs)
+    call mem_alloc(diff_all,sumprim_pairs)
+ 
+    call mem_alloc(expSQ_restrict,System%Nexp,System%Nexp)
+    do k=1,System%Nexp
+       do j=1,System%Nexp
+          expSQ_restrict(j,k) = &
+               (abs(System%exponents(j) - System%exponents(k))<Control%REDTHR)
+       enddo
+    enddo
+
+    sumprim_pairs = 0
+    do l=1,System%NumGen
+       do k=1,System%n_pairs
+          do j=1,System%n_pairs
+             System%PairSystem_G(l)%gen_type = Input%PairInput_G(l)%gen_type
+             associate(PairInput => Input%PairInput_G(l)%PairInput(j,k), &
+                  PairSystem => System%PairSystem_G(l)%PairSystem(j,k), &
+                  gen_type => System%PairSystem_G(l)%gen_type)
+    
+               PairSystem%mult = PairInput%mult
+    
+               if(PairSystem%mult<0) cycle
+   
+               write(LOUT,'(a,1x,a,1x,a)') 'Processing', trim(get_gen_name(gen_type)), 'generator:'  
+               write(LOUT,'(4x,a,2(i3,a),a)') '-Processing pair: ',&
+                    min(j,k),', ',max(j,k),', ',possible_mult(PairSystem%mult)
+    
+               nprim_pairs = PairInput%Nprimitives
+               prim(:,1:nprim_pairs) = PairInput%pair_control
+               do i=1,nprim_pairs
+                  prim(1,i) = exp_reorder(prim(1,i))
+                  prim(2,i) = exp_reorder(prim(2,i))
+               enddo
+     
+               order_tmp = System%Nexp*1000 + gen_type
+               call sort_prim(nprim_pairs,prim,diff,order_tmp,compare_prim_pairs)
+               if(any(diff(1:nprim_pairs)>2)) then
+                  write(LOUT,'(a)') &
+                       'ERROR!!! Some of the pair primitives are redefined!'
+                  call print_pair_control(nprim_pairs,prim)
+                  stop
+               endif
+               if(any(diff(1:nprim_pairs)==0)) then
+                  write(LOUT,'(a)') &
+                       'ERROR!!! Some of the pair primitives appear more than once!'
+                  call print_pair_control(nprim_pairs,prim)
+                  stop
+               endif
+               call create_PairSystem(PairSystem,nprim_pairs,prim,&
+                    diff,gen_type,System%Nexp,expSQ_restrict)
+               call check_PairSystem(PairSystem)
+    
+               !prim_all(:,sumprim_pairs+1:sumprim_pairs+nprim_pairs) = &
+               prim_all(1:6,sumprim_pairs+1:sumprim_pairs+nprim_pairs) = &
+                    prim(:,1:nprim_pairs)
+               prim_all(7,sumprim_pairs+1:sumprim_pairs+nprim_pairs) = &
+                    gen_type 
+               sumprim_pairs = sumprim_pairs + nprim_pairs
+    
+             end associate
+          enddo
+       enddo
+    enddo
+
+    order_tmp = System%Nexp*1000 
+    call sort_prim(sumprim_pairs,prim_all,diff_all,order_tmp,compare_prim_pairs)
+    call reduce_prim(sumprim_pairs,prim_all,diff_all,7)
+  ! hapka: 1) any smart checking of reduce_prim?
+  !        2) next: create_PairReduced
+! hapka: old_drake
 !    call mem_alloc(expSQ_restrict,System%NexpSQ)
 !    i = 0
 !    do k=1,System%Nexp
@@ -625,7 +694,7 @@ integer :: i,j,k,l
 !            &Wrong number of exponents(SQ) in create_System!'
 !       stop
 !    endif
-! 
+ 
 !    sumprim_pairs = 0
 !    do k=1,System%n_pairs
 !       do j=1,System%n_pairs
@@ -688,15 +757,15 @@ integer :: i,j,k,l
 !    call check_consistency_PairReduced(System%NexpSQ,&
 !         System%OrbPairReduced,System%PairReduced)
 ! 
-!    call mem_dealloc(expSQ_restrict)
-! 
-!    call mem_dealloc(diff_all)
-!    call mem_dealloc(diff)
-!    call mem_dealloc(prim_all)
-!    call mem_dealloc(prim)
-! 
-! endif
-! 
+    call mem_dealloc(expSQ_restrict)
+ 
+    call mem_dealloc(diff_all)
+    call mem_dealloc(diff)
+    call mem_dealloc(prim_all)
+    call mem_dealloc(prim)
+ 
+ endif
+ 
  call mem_dealloc(exp_reorder)
  call mem_dealloc(n_orbs)
  
@@ -706,14 +775,16 @@ integer :: i,j,k,l
    
 end subroutine create_System
 
-subroutine sort_prim(n,prim,diff,compare_prim)
+subroutine sort_prim(n,prim,diff,order,compare_prim)
 use misc, only : swap
 implicit none
 integer :: n
 integer :: prim(:,:),diff(:)
+integer :: order
 interface
-function compare_prim(prim1,prim2) result(diff_type)
+function compare_prim(order,prim1,prim2) result(diff_type)
 integer :: diff_type
+integer,intent(in) :: order
 integer,intent(in) :: prim1(:),prim2(:)
 end function compare_prim
 end interface
@@ -722,7 +793,7 @@ integer :: i,j
 do j=2,n
    i = j
    do while(i>1)
-      if(compare_prim(prim(:,i-1),prim(:,i))<0) then
+      if(compare_prim(order,prim(:,i-1),prim(:,i))<0) then
          call swap(prim(:,i-1),prim(:,i))
          i = i - 1
       else
@@ -733,7 +804,7 @@ enddo
 
 diff = 1
 do i=2,n
-   diff(i) = compare_prim(prim(:,i-1),prim(:,i))
+   diff(i) = compare_prim(order,prim(:,i-1),prim(:,i))
 enddo
 if(any(diff<0)) then
    write(LOUT,'(a)') &
@@ -743,9 +814,50 @@ endif
 
 end subroutine sort_prim
 
-subroutine reduce_prim(n,prim,diff)
+! hapka: old_drake
+!subroutine reduce_prim(n,prim,diff)
+!implicit none
+!integer :: n
+!integer :: prim(:,:),diff(:)
+!integer :: diff_type
+!integer :: i,j
+!
+!j = 2
+!do while(j<=n)
+!   diff_type = diff(j)
+!   if(diff_type==0.or.diff_type>10) then
+!
+!         if(diff_type>10) then
+!            do i=diff_type/10,mod(diff_type,10)
+!               prim(i,j-1) = max(prim(i,j-1),prim(i,j))
+!            enddo
+!         endif
+!
+!         do i=j,n-1
+!            prim(:,i) = prim(:,i+1)
+!            diff(i)   = diff(i+1)
+!         enddo
+!
+!         n = n - 1
+!   else
+!
+!      j = j + 1
+!
+!   endif
+!enddo
+!
+!if(any(diff(1:n)==0).or.any(diff(1:n)>10)) then
+!   write(LOUT,'(a)') &
+!        'ERROR!!! Primitives have not been reduced properly in reduce_prim!'
+!   stop
+!endif
+!
+!end subroutine reduce_prim
+
+subroutine reduce_prim(n,prim,diff,order)
 implicit none
 integer :: n
+integer :: order
 integer :: prim(:,:),diff(:)
 integer :: diff_type
 integer :: i,j
@@ -753,7 +865,7 @@ integer :: i,j
 j = 2
 do while(j<=n)
    diff_type = diff(j)
-   if(diff_type==0.or.diff_type>10) then
+   if((diff_type==0.or.diff_type>10).and.(prim(order,j-1).eq.prim(order,j))) then
 
          if(diff_type>10) then
             do i=diff_type/10,mod(diff_type,10)
@@ -773,12 +885,6 @@ do while(j<=n)
 
    endif
 enddo
-
-if(any(diff(1:n)==0).or.any(diff(1:n)>10)) then
-   write(LOUT,'(a)') &
-        'ERROR!!! Primitives have not been reduced properly in reduce_prim!'
-   stop
-endif
 
 end subroutine reduce_prim
 
@@ -982,13 +1088,14 @@ enddo
 
 end subroutine add_OrbReduced
 
-subroutine create_PairSystem(PairSystem,n,prim,diff,expSQ_restrict)
+subroutine create_PairSystem(PairSystem,n,prim,diff,gentype,Nexp,expSQ_restrict)
 implicit none
 type(PairSystemData) :: PairSystem
 integer,intent(in) :: n
 integer,intent(in) :: prim(:,:)
 integer,intent(in) :: diff(:)
-logical,intent(in) :: expSQ_restrict(:)
+integer,intent(in) :: gentype,Nexp
+logical,intent(in) :: expSQ_restrict(:,:)
 integer :: icnt,istart,iend
 integer :: iexp1,iexp2,iexpSQ,itype
 integer :: irange,maxrange
@@ -1008,12 +1115,16 @@ do while(istart<=n)
 
    iexp1 = prim(1,istart)
    iexp2 = prim(2,istart)
-   if(iexp1>iexp2) then
-      write(LOUT,'(a)') 'ERROR!!! &
-           &Incorrect exponents order in create_PairSystem!'
-      stop
+   if(swapable_generators(gentype)) then 
+      if(iexp1>iexp2) then
+         write(LOUT,'(a)') 'ERROR!!! &
+              &Incorrect exponents order in create_PairSystem!'
+         stop
+      endif
+      iexpSQ = iexp1 + (iexp2 - 1)*iexp2/2
+   else
+      iexpSQ = iexp1 + (iexp2 - 1)*Nexp
    endif
-   iexpSQ = iexp1 + (iexp2 - 1)*iexp2/2
 
    itype = prim(3,istart)
 
@@ -1031,7 +1142,9 @@ do while(istart<=n)
      PairSpec%iexp2    = iexp2
      PairSpec%iexpSQ   = iexpSQ
      PairSpec%itype    = itype
-     PairSpec%restrict = expSQ_restrict(PairSpec%iexpSQ)
+     PairSpec%restrict = expSQ_restrict(PairSpec%iexp1,PairSpec%iexp2) & 
+                         .and.swapable_generators(gentype)
+     !PairSpec%restrict = expSQ_restrict(PairSpec%iexpSQ)
      PairSpec%n_range  = iend - istart + 1
      PairSpec%irange1  = -1
 
@@ -1047,7 +1160,7 @@ do while(istart<=n)
         endif
 
         PairSpec%irange1 = prim(4,istart)
-
+ 
         irange = PairSpec%irange1
         if(PairSpec%restrict) then
            nbas = ((irange + 2)*(irange + 4)*(2*irange + 3))/24

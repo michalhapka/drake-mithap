@@ -54,7 +54,7 @@ type(InputData) :: Input
 character(slength) :: line,keyword
 integer :: icnt,iorb,ipair1,ipair2,imult
 integer :: i,j
-integer :: itmp, gen_num
+integer :: itmp, num_gen
 logical :: swapped
 character(8) :: smult, lorb_tmp
 character(8) :: gen_tmp
@@ -312,23 +312,18 @@ if(index(Input%calc_type,'SCF')==0) then
    select case(trim(Input%pairs_basis))
    case('COMMON')
 
-      if(Input%maxl.eq.0) then
-        gen_num = 1 
-      else
-        gen_num = 5 
-      endif
-      ! hapka: maxl>1 not implemented!!!
-      allocate(Input%PairInput_G(gen_num))
-      allocate(given(gen_num))
+      num_gen = get_num_gen(Input%maxl)
+      allocate(Input%PairInput_G(num_gen))
+      allocate(given(num_gen))
       
       given = .false.
-      do i=1,gen_num
+      do i=1,num_gen
 
          call read_line(line)
          if(check_keyword(line,'END',end_flag)) then
            write(LOUT,'(a,i3,2x,a,i3,2x,a)') 'For maxl =', Input%maxl, 'expected', &
-                                              gen_num, 'pair generators!'
-           do j=1,gen_num
+                                              num_gen, 'pair generators!'
+           do j=1,num_gen
               if(.not.given(j)) write(LOUT,'(a)') 'Missing ' // get_gen_name(j) // ' generator!'
            enddo
            call incorrect_data
@@ -336,13 +331,9 @@ if(index(Input%calc_type,'SCF')==0) then
 
          call read_keyword_and_advance_line(line,'GENERATOR','=')
          call read_value_and_advance_line(line,gen_tmp,end_flag)
-         if(all(trim(gen_tmp)/=possible_generators)) then
-            write(LOUT,'(a)') 'Unrecognizable type of generator! Choose one of:'
-            write(LOUT,'(a)') possible_generators
-            call incorrect_data
-         endif
-
          itmp = get_gen_n(trim(gen_tmp))
+         Input%PairInput_G(itmp)%gen_type = find_gen_type(trim(gen_tmp)) 
+
          if(given(itmp)) then
             write(LOUT,'(a)') 'Generator ' // trim(gen_tmp) // ' allocated twice!'
             call incorrect_data
@@ -352,7 +343,6 @@ if(index(Input%calc_type,'SCF')==0) then
          allocate(Input%PairInput_G(itmp)%PairInput(1,1))
          associate(PairInput => Input%PairInput_G(itmp)%PairInput(1,1))
             PairInput%mult = 0 
-            Input%PairInput_G(itmp)%gen_type=trim(gen_tmp)  
  
             call read_line(line)
             call read_PairInput(PairInput, &
@@ -727,7 +717,8 @@ contains
   subroutine read_PairInput(PairInput,gentype)
   implicit none
   type(PairInputData) :: PairInput
-  character(8) :: gentype
+  !character(8) :: gentype
+  integer :: gentype
   integer :: iexp(2),itype,irange(3)
   integer :: i,j
 
@@ -767,7 +758,8 @@ contains
         call incorrect_data
      endif
    
-     if ((gentype.eq.'S^E').or.(gentype.eq.'P^E').or.(gentype.eq.'D^E(1)')) then
+     !if ((gentype.eq.'S^E').or.(gentype.eq.'P^E').or.(gentype.eq.'D^E(1)')) then
+     if (swapable_generators(gentype)) then
           if(iexp(1)>iexp(2)) then
              call swap(iexp(1),iexp(2))
              if(itype>2) call swap(irange(1),irange(2))
@@ -780,6 +772,23 @@ contains
   enddo
 
   end subroutine read_PairInput
+
+  function find_gen_type(gen_tmp) result(num)
+  implicit none
+  character(*),intent(in) :: gen_tmp
+  integer :: num
+  
+  do num=1,total_gen
+     if(trim(gen_tmp)==possible_generators(num)) exit
+  enddo
+
+  if(num>total_gen) then
+     write(LOUT,'(a)') 'Unrecognizable type of generator! Choose one of:'
+     write(LOUT,'(a)') possible_generators
+     call incorrect_data
+  endif 
+
+  end function find_gen_type
 
 end subroutine read_InputFile
 

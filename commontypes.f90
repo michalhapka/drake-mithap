@@ -6,11 +6,11 @@ implicit none
 
 private
 public possible_calc_type,possible_basis,possible_mult,possible_int3
-public possible_generators
+public get_num_gen,total_gen,possible_generators,swapable_generators
 public print_EndSection
 public InputData,OrbInputData,PairInputData,init_Input,free_Input,print_Input
 public print_orb_control,print_pair_control,compare_prim_orbs,compare_prim_pairs
-public compare_prim_orbs_l
+!public compare_prim_orbs_l
 public ControlData,fill_Control
 public SystemData,init_System,free_System,print_System,print_SystemExponents
 public OrbSystemData,OrbSpecData,OrbReducedData
@@ -49,8 +49,14 @@ character(*),parameter :: possible_calc_type(*) = &
 character(*),parameter :: possible_basis(2) = &
      [character(8) :: 'COMMON', 'SEPARATE']
 
-character(*),parameter :: possible_generators(5) = &
+integer,parameter :: get_num_gen(0:1) = [1,5]
+integer,parameter :: total_gen = 5
+
+character(*),parameter :: possible_generators(total_gen) = &
      [character(8) :: 'S^E', 'P^E', 'P^O', 'D^E(1)', 'D^E(2)']
+
+logical,parameter :: swapable_generators(total_gen) = &
+     [.true., .true., .false., .true., .false.]
 
 character(*),parameter :: possible_mult(-1:3) = &
      [character(8) :: 'UNDEF', 'ALL', 'SINGLET', 'BOTH', 'TRIPLET']
@@ -75,7 +81,7 @@ end type PairInputData
 
 type PairInputData_G
 type(PairInputData),allocatable :: PairInput(:,:)
-character(8) :: gen_type
+integer :: gen_type
 end type PairInputData_G
 
 type InputData
@@ -180,7 +186,7 @@ end type PairSystemData
 
 type PairSystemData_G
 type(PairSystemData),allocatable :: PairSystem(:,:)
-character(8) :: gen_type
+integer :: gen_type
 end type PairSystemData_G
 
 type PairReducedData
@@ -206,7 +212,7 @@ logical :: common_orbs,common_pairs
 integer,allocatable :: n_orbs(:)
 integer :: n_pairs
 integer :: Neta
-integer :: GenNum
+integer :: NumGen
 integer,allocatable :: eta(:)
 integer :: Nexp,NexpSQ
 real(prec),allocatable :: exponents(:)
@@ -439,7 +445,7 @@ if(index(Input%calc_type,'SCF')==0) then
    case('COMMON')
 
 do  i=1,size(Input%PairInput_G)
-      write(LOUT,'(2a)') 'GENERATOR  = ',Input%PairInput_G(i)%gen_type
+      write(LOUT,*) 'GENERATOR  = ',get_gen_name(Input%PairInput_G(i)%gen_type)
       associate(PairInput => Input%PairInput_G(i)%PairInput(1,1))
         call print_pair_control(PairInput%Nprimitives,&
              PairInput%pair_control)
@@ -613,9 +619,10 @@ enddo
 
 end subroutine print_pair_control
 
-function compare_prim_orbs(orb1,orb2) result(diff_type)
+function compare_prim_orbs(order,orb1,orb2) result(diff_type)
 implicit none
 integer :: diff_type
+integer,intent(in) :: order
 integer,intent(in) :: orb1(:),orb2(:)
 integer :: key1,key2
 
@@ -626,10 +633,10 @@ if(key1/=key2) then
    return
 endif
 
-key1 = orb1(2)
-key2 = orb2(2)
+key1 = orb1(order)
+key2 = orb2(order)
 if(key1/=key2) then
-   diff_type = sign(22,key2-key1)
+   diff_type = sign(11*order,key2-key1)
    return
 endif
 
@@ -637,47 +644,72 @@ diff_type = 0
 
 end function compare_prim_orbs
 
-function compare_prim_orbs_l(orb1,orb2) result(diff_type)
+!function compare_prim_orbs_l(order,orb1,orb2) result(diff_type)
+!implicit none
+!integer :: diff_type
+!integer,intent(in) :: order
+!integer,intent(in) :: orb1(:),orb2(:)
+!integer :: key1,key2
+!
+!key1 = orb1(1)
+!key2 = orb2(1)
+!if(key1/=key2) then
+!   diff_type = sign(1,key2-key1)
+!   return
+!endif
+!
+!key1 = orb1(3)
+!key2 = orb2(3)
+!if(key1/=key2) then
+!   diff_type = sign(33,key2-key1)
+!   return
+!endif
+!
+!diff_type = 0
+!
+!end function compare_prim_orbs_l
+
+
+function compare_prim_pairs(order,pair1,pair2) result(diff_type)
 implicit none
 integer :: diff_type
-integer,intent(in) :: orb1(:),orb2(:)
-integer :: key1,key2
-
-key1 = orb1(1)
-key2 = orb2(1)
-if(key1/=key2) then
-   diff_type = sign(1,key2-key1)
-   return
-endif
-
-key1 = orb1(3)
-key2 = orb2(3)
-if(key1/=key2) then
-   diff_type = sign(33,key2-key1)
-   return
-endif
-
-diff_type = 0
-
-end function compare_prim_orbs_l
-
-
-function compare_prim_pairs(pair1,pair2) result(diff_type)
-implicit none
-integer :: diff_type
+integer,intent(in) :: order
 integer,intent(in) :: pair1(:),pair2(:)
+integer :: gen_num,rows
 integer :: key1,key2
 integer :: itype
 
-if(pair1(1)>pair1(2).or.pair2(1)>pair2(2)) then
-   write(LOUT,'(a)') 'ERROR!!! Incorrect exponents order in compare_prim_pairs!'
-   stop
+gen_num = mod(order,1000)
+
+if(gen_num==0) then
+   rows = order/1000
+   key1 = pair1(1) + (pair1(2)-1)*rows
+   key2 = pair2(1) + (pair2(2)-1)*rows
+elseif(swapable_generators(gen_num)) then
+   if(pair1(1)>pair1(2).or.pair2(1)>pair2(2)) then
+      write(LOUT,'(a)') 'ERROR!!! Incorrect exponents order in compare_prim_pairs!'
+      stop
+   endif
+   key1 = pair1(1) + (pair1(2)-1)*pair1(2)/2
+   key2 = pair2(1) + (pair2(2)-1)*pair2(2)/2
+else
+   rows = order/1000
+   key1 = pair1(1) + (pair1(2)-1)*rows
+   key2 = pair2(1) + (pair2(2)-1)*rows
 endif
-key1 = pair1(1) + (pair1(2)-1)*pair1(2)/2
-key2 = pair2(1) + (pair2(2)-1)*pair2(2)/2
 if(key1/=key2) then
    diff_type = sign(1,key2-key1)
    return
+endif
+
+if(gen_num==0) then
+   key1 = pair1(7)
+   key2 = pair2(7)
+   if(key1/=key2) then
+! hapka: which command: is "1" ok?
+      diff_type = sign(1,key2-key1)
+      return
+   endif
 endif
 
 key1 = pair1(3)
@@ -791,7 +823,7 @@ integer :: i,j,k
 call mem_alloc(System%eta         ,System%Neta)
 call mem_alloc(System%exponents   ,System%Nexp)
 call mem_alloc(System%isUsed_orbs ,System%Nexp, System%maxl+1)
-call mem_alloc(System%isUsed_pairs,System%Nexp, System%GenNum)
+call mem_alloc(System%isUsed_pairs,System%Nexp, System%NumGen)
 call mem_alloc(System%isOpt_orbs  ,System%Nexp)
 call mem_alloc(System%isOpt_pairs ,System%Nexp)
 
@@ -825,15 +857,15 @@ call mem_alloc(System%isOpt_pairs ,System%Nexp)
   
   if(System%post_SCF) then
   
-     allocate(System%PairSystem_G(System%GenNum))
-     do i=1,System%GenNum
+     allocate(System%PairSystem_G(System%NumGen))
+     do i=1,System%NumGen
         allocate(System%PairSystem_G(i)%PairSystem(System%n_pairs,System%n_pairs))
      enddo
 
  !    allocate(System%PairReduced(System%NexpSQ))
  !    allocate(System%OrbPairReduced(System%NexpSQ))
  !
-     do k=1,System%GenNum
+     do k=1,System%NumGen
         do j=1,System%n_pairs
            do i=1,System%n_pairs
               call init_PairSystem(System%PairSystem_G(k)%PairSystem(i,j))
@@ -878,7 +910,7 @@ if(System%post_SCF) then
 !   enddo
 !
 
-   do k=1,System%GenNum
+   do k=1,System%NumGen
       do j=1,System%n_pairs
          do i=1,System%n_pairs
             call free_PairSystem(System%PairSystem_G(k)%PairSystem(i,j))
@@ -1606,7 +1638,7 @@ use misc, only : swap
 implicit none
 type(SystemData) :: System
 integer :: LPRINT
-integer :: i,j,idx1,idx2
+integer :: i,j,k,idx1,idx2
 character(10),allocatable,dimension(:) :: tostr
 character(180) :: fout1,fout2
 character(8) :: one,two
@@ -1748,7 +1780,35 @@ if(System%post_SCF) then
    else
       write(LOUT,'(a)') 'SEPARATE'
    endif
-   write(LOUT,'(a)') 'FIX print_System!'
+!   write(LOUT,'(a)') 'FIX print_System!'
+do k=1,System%NumGen
+   do j=1,System%n_pairs
+      do i=1,j
+
+         idx1 = j
+         idx2 = i
+         do
+            associate(PairSystem => System%PairSystem_G(k)%PairSystem(idx1,idx2),&
+                      gentype => System%PairSystem_G(k)%gen_type )
+              if(PairSystem%mult>=0) then
+                 write(LOUT,'()')
+                 if(.not.System%common_pairs) &
+                      write(LOUT,'(a,2(i3,a),a)') &
+                      'pair no. ',i,', ',j,', ',possible_mult(PairSystem%mult)
+                 write(LOUT,'(a,1x,a)') trim(get_gen_name(gentype)), 'generator'
+                 call print_PairSystem(PairSystem,LPRINT)
+              endif
+            end associate
+
+            if(idx1<=idx2) exit
+            call swap(idx1,idx2)
+         enddo
+
+      enddo
+   enddo
+enddo 
+
+! hapka: old_drake
 !   do j=1,System%n_pairs
 !      do i=1,j
 !
@@ -1771,6 +1831,7 @@ if(System%post_SCF) then
 !
 !      enddo
 !   enddo
+
 
 !   if(LPRINT>=5) then
 !
@@ -1905,7 +1966,7 @@ if(LPRINT>=2) then
       associate(PairSpec => PairSystem%PairSpec(j))
         write(LOUT,'(10x,i3,a,2i3,a,i5,a,8x,a,i1,10x,i5,2x,i5,a,i5)') &
              j,' : ',PairSpec%iexp1,PairSpec%iexp2,' (',PairSpec%iexpSQ,') ',&
-             'TYPE',PairSpec%itype,&
+             'TYPE ',PairSpec%itype,&
              PairSpec%nbas,&
              PairSpec%offset+1,' - ',PairSpec%offset+PairSpec%nbas
         select case(PairSpec%itype)

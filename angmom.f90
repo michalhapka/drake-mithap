@@ -133,7 +133,7 @@ end function get_gen_n
 
 function get_gen_name(n) result(name)
 implicit none
-character(3) :: name
+character(6) :: name
 integer,intent(in) :: n
 select case(n)
 case(1)
@@ -141,7 +141,7 @@ name='S^E'
 case(2)
 name='P^E'
 case(3)
-name='P^0'
+name='P^O'
 case(4)
 name='D^E(1)'
 case(5)
@@ -151,6 +151,5 @@ write(LOUT,'(a,i3)') 'Incorrect generator number: ',n
 stop
 end select
 end function get_gen_name
-
 
 end module angmom
