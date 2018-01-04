@@ -16,6 +16,7 @@ public SystemData,init_System,free_System,print_System,print_SystemExponents
 public OrbSystemData,OrbSpecData,OrbReducedData
 public OrbSystemData_L
 public PairSystemData,PairSpecData,PairReducedData
+public init_PairReduced_G
 public check_PairSystem,check_consistency_PairReduced
 public increment_PairSpec
 public maxOmega_PairSpec,maxt_PairSpec,maxuv_PairSpec
@@ -189,16 +190,30 @@ type(PairSystemData),allocatable :: PairSystem(:,:)
 integer :: gen_type
 end type PairSystemData_G
 
-type PairReducedData
-logical :: isUsed
-integer :: iexp1,iexp2,iexpSQ
+type PairReducedData_G
+integer :: gen_type
 logical :: istype1,istype2,istype3
 integer :: maxrange1
 integer :: n_range2
 integer,allocatable :: maxrange2(:,:)
 integer :: n_range3
 integer,allocatable :: maxrange3(:,:)
+end type PairReducedData_G
+
+type PairReducedData
+logical :: isUsed
+integer :: iexp1,iexp2,iexpSQ
+integer :: n_gen
+type(PairReducedData_G),allocatable :: PairReduced_G(:)
+!logical :: istype1,istype2,istype3
+!integer :: maxrange1
+!integer :: n_range2
+!integer,allocatable :: maxrange2(:,:)
+!integer :: n_range3
+!integer,allocatable :: maxrange3(:,:)
 end type PairReducedData
+
+
 
 type SystemData
 real(prec) :: nucZ
@@ -707,7 +722,7 @@ if(gen_num==0) then
    key2 = pair2(7)
    if(key1/=key2) then
 ! hapka: which command: is "1" ok?
-      diff_type = sign(1,key2-key1)
+      diff_type = sign(5,key2-key1)
       return
    endif
 endif
@@ -715,7 +730,8 @@ endif
 key1 = pair1(3)
 key2 = pair2(3)
 if(key1/=key2) then
-   diff_type = sign(6,key2-key1)
+   !diff_type = sign(6,key2-key1)
+   diff_type = sign(3,key2-key1)
    return
 endif
 
@@ -862,9 +878,9 @@ call mem_alloc(System%isOpt_pairs ,System%Nexp)
         allocate(System%PairSystem_G(i)%PairSystem(System%n_pairs,System%n_pairs))
      enddo
 
- !    allocate(System%PairReduced(System%NexpSQ))
- !    allocate(System%OrbPairReduced(System%NexpSQ))
- !
+     allocate(System%PairReduced(System%NexpSQ))
+     allocate(System%OrbPairReduced(System%NexpSQ))
+ 
      do k=1,System%NumGen
         do j=1,System%n_pairs
            do i=1,System%n_pairs
@@ -884,13 +900,13 @@ call mem_alloc(System%isOpt_pairs ,System%Nexp)
  !       enddo
  !    enddo
  ! 
- !    do i=1,System%NexpSQ
- !       call init_PairReduced(System%PairReduced(i))
- !    enddo
- !    do i=1,System%NexpSQ
- !       call init_PairReduced(System%OrbPairReduced(i))
- !    enddo
- ! 
+     do i=1,System%NexpSQ
+        call init_PairReduced(System%PairReduced(i))
+     enddo
+     do i=1,System%NexpSQ
+        call init_PairReduced(System%OrbPairReduced(i))
+     enddo
+  
   endif
 
 end subroutine init_System
@@ -901,13 +917,13 @@ type(SystemData) :: System
 integer :: i,j,k
 
 if(System%post_SCF) then
-!
-!   do i=1,System%NexpSQ
-!      call free_PairReduced(System%OrbPairReduced(i))
-!   enddo
-!   do i=1,System%NexpSQ
-!      call free_PairReduced(System%PairReduced(i))
-!   enddo
+
+   do i=1,System%NexpSQ
+      call free_PairReduced(System%OrbPairReduced(i))
+   enddo
+   do i=1,System%NexpSQ
+      call free_PairReduced(System%PairReduced(i))
+   enddo
 !
 
    do k=1,System%NumGen
@@ -924,8 +940,8 @@ if(System%post_SCF) then
 !      enddo
 !   enddo
 !
-!   deallocate(System%OrbPairReduced)
-!   deallocate(System%PairReduced)
+   deallocate(System%OrbPairReduced)
+   deallocate(System%PairReduced)
 !   deallocate(System%PairSystem)
    deallocate(System%PairSystem_G)
 
@@ -1020,21 +1036,47 @@ PairReduced%isUsed    = .false.
 PairReduced%iexp1     = 0
 PairReduced%iexp2     = 0
 PairReduced%iexpSQ    = 0
-PairReduced%istype1   = .false.
-PairReduced%istype2   = .false.
-PairReduced%istype3   = .false.
-PairReduced%maxrange1 = -1
-PairReduced%n_range2  = 0
-PairReduced%n_range3  = 0
+!PairReduced%istype1   = .false.
+!PairReduced%istype2   = .false.
+!PairReduced%istype3   = .false.
+!PairReduced%maxrange1 = -1
+!PairReduced%n_range2  = 0
+!PairReduced%n_range3  = 0
 
 end subroutine init_PairReduced
+
+subroutine init_PairReduced_G(PairReduced_G)
+implicit none
+type(PairReducedData_G) :: PairReduced_G
+
+PairReduced_G%istype1   = .false.
+PairReduced_G%istype2   = .false.
+PairReduced_G%istype3   = .false.
+PairReduced_G%maxrange1 = -1
+PairReduced_G%n_range2  = 0
+PairReduced_G%n_range3  = 0
+PairReduced_G%gen_type  = -1
+
+end subroutine init_PairReduced_G
 
 subroutine free_PairReduced(PairReduced)
 implicit none
 type(PairReducedData) :: PairReduced
+integer :: i
 
-if(PairReduced%istype2) call mem_dealloc(PairReduced%maxrange2)
-if(PairReduced%istype3) call mem_dealloc(PairReduced%maxrange3)
+if(allocated(PairReduced%PairReduced_G)) then
+   do i=1,PairReduced%n_gen
+      associate(PairReduced => PairReduced%PairReduced_G(i))
+        if(PairReduced%istype2) call mem_dealloc(PairReduced%maxrange2)
+        if(PairReduced%istype3) call mem_dealloc(PairReduced%maxrange3)
+      end associate
+   enddo
+   deallocate(PairReduced%PairReduced_G)
+endif
+
+! hapka: old_drake
+!if(PairReduced%istype2) call mem_dealloc(PairReduced%maxrange2)
+!if(PairReduced%istype3) call mem_dealloc(PairReduced%maxrange3)
 
 end subroutine free_PairReduced
 
@@ -1425,7 +1467,7 @@ subroutine check_consistency_PairReduced(NexpSQ,OrbPairReduced,PairReduced)
 implicit none
 integer :: NexpSQ
 type(PairReducedData) :: OrbPairReduced(:),PairReduced(:)
-integer :: i,sOrbPair,sPair
+integer :: i,j,k,sOrbPair,sPair
 
 do i=1,NexpSQ
    associate(OrbPairSpec => OrbPairReduced(i), PairSpec => PairReduced(i))
@@ -1445,69 +1487,151 @@ do i=1,NexpSQ
         endif
      endif
 
-     if(OrbPairSpec%istype1.neqv.PairSpec%istype1) then
-        write(LOUT,'(a)') 'ERROR!!! &
-             &Test 1a in check_consistency_PairReduced!'
-        stop
-     endif
-     if(PairSpec%istype1) then
-        if(OrbPairSpec%maxrange1/=PairSpec%maxrange1) then
-           write(LOUT,'(a)') 'ERROR!!! &
-                &Test 1b in check_consistency_PairReduced!'
+     do j=1,PairSpec%n_gen
+        associate(PairSpecG => PairSpec%PairReduced_G(j)) 
+          if(PairSpecG%gen_type==6) then
+             write(LOUT,'(a)') 'ERROR!!! &
+                   & Wrong gen_type in check_consistency_PairReduced!'
            stop
-        endif
-     endif
+           endif
 
-     if(OrbPairSpec%istype2.neqv.PairSpec%istype2) then
-        write(LOUT,'(a)') 'ERROR!!! &
-             &Test 2a in check_consistency_PairReduced!'
-        stop
-     endif
-     if(PairSpec%istype2) then
-        if(OrbPairSpec%n_range2/=PairSpec%n_range2) then
-           write(LOUT,'(a)') 'ERROR!!! &
-                &Test 2b in check_consistency_PairReduced!'
-           stop
-        endif
-        if(any(OrbPairSpec%maxrange2/=PairSpec%maxrange2)) then
-           write(LOUT,'(a)') 'ERROR!!! &
-                &Test 2c in check_consistency_PairReduced!'
-           stop
-        endif
-     endif
+           do k=1,OrbPairSpec%n_gen
+              associate(OrbPairSpecG => OrbPairSpec%PairReduced_G(k)) 
+                if(OrbPairSpecG%gen_type.eq.PairSpecG%gen_type) then
 
-     if(.not.OrbPairSpec%istype3.and.PairSpec%istype3) then
-        write(LOUT,'(a)') 'ERROR!!! &
-             &Test 3a in check_consistency_PairReduced!'
-        stop
-     endif
-     if(PairSpec%istype3) then
-        sOrbPair = merge(2,1,OrbPairSpec%maxrange3(3,1)==0)
-        sPair    = merge(2,1,   PairSpec%maxrange3(3,1)==0)
-        if((OrbPairSpec%n_range3-sOrbPair+1)/=(PairSpec%n_range3-sPair+1)) then
-           write(LOUT,'(a)') 'ERROR!!! &
-                &Test 3b in check_consistency_PairReduced!'
-           stop
-        endif
-        if(any(OrbPairSpec%maxrange3(:,sOrbPair:)/= &
-             PairSpec%maxrange3(:,sPair:))) then
-           write(LOUT,'(a)') 'ERROR!!! &
-                &Test 3c in check_consistency_PairReduced!'
-           stop
-        endif
-     elseif(OrbPairSpec%istype3) then
-        if(OrbPairSpec%n_range3/=1) then
-           write(LOUT,'(a)') 'ERROR!!! &
-                &Test 3b in check_consistency_PairReduced!'
-           stop
-        endif
-        if(OrbPairSpec%maxrange3(3,1)/=0) then
-           write(LOUT,'(a)') 'ERROR!!! &
-                &Test 3c in check_consistency_PairReduced!'
-           stop
-        endif
-     endif
+                   if(OrbPairSpecG%istype1.neqv.PairSpecG%istype1) then
+                      write(LOUT,'(a)') 'ERROR!!! &
+                           &Test 1a in check_consistency_PairReduced!'
+                      stop
+                   endif
+                   if(PairSpecG%istype1) then
+                      if(OrbPairSpecG%maxrange1/=PairSpecG%maxrange1) then
+                         write(LOUT,'(a)') 'ERROR!!! &
+                              &Test 1b in check_consistency_PairReduced!'
+                         stop
+                      endif
+                   endif
 
+                   if(OrbPairSpecG%istype2.neqv.PairSpecG%istype2) then
+                      write(LOUT,'(a)') 'ERROR!!! &
+                           &Test 2a in check_consistency_PairReduced!'
+                      stop
+                   endif
+                   if(PairSpecG%istype2) then
+                      if(OrbPairSpecG%n_range2/=PairSpecG%n_range2) then
+                         write(LOUT,'(a)') 'ERROR!!! &
+                              &Test 2b in check_consistency_PairReduced!'
+                         stop
+                      endif
+                      if(any(OrbPairSpecG%maxrange2/=PairSpecG%maxrange2)) then
+                         write(LOUT,'(a)') 'ERROR!!! &
+                              &Test 2c in check_consistency_PairReduced!'
+                         stop
+                      endif
+                   endif
+
+                   if(.not.OrbPairSpecG%istype3.and.PairSpecG%istype3) then
+                      write(LOUT,'(a)') 'ERROR!!! &
+                           &Test 3a in check_consistency_PairReduced!'
+                      stop
+                   endif
+                   if(PairSpecG%istype3) then
+                      sOrbPair = merge(2,1,OrbPairSpecG%maxrange3(3,1)==0)
+                      sPair    = merge(2,1,   PairSpecG%maxrange3(3,1)==0)
+                      if((OrbPairSpecG%n_range3-sOrbPair+1)/=(PairSpecG%n_range3-sPair+1)) then
+                         write(LOUT,'(a)') 'ERROR!!! &
+                              &Test 3b in check_consistency_PairReduced!'
+                         stop
+                      endif
+                      if(any(OrbPairSpecG%maxrange3(:,sOrbPair:)/= &
+                           PairSpecG%maxrange3(:,sPair:))) then
+                         write(LOUT,'(a)') 'ERROR!!! &
+                              &Test 3c in check_consistency_PairReduced!'
+                         stop
+                      endif
+                   elseif(OrbPairSpecG%istype3) then
+                      if(OrbPairSpecG%n_range3/=1) then
+                         write(LOUT,'(a)') 'ERROR!!! &
+                              &Test 3b in check_consistency_PairReduced!'
+                         stop
+                      endif
+                      if(OrbPairSpecG%maxrange3(3,1)/=0) then
+                         write(LOUT,'(a)') 'ERROR!!! &
+                              &Test 3c in check_consistency_PairReduced!'
+                         stop
+                      endif
+                   endif
+
+                endif  
+              end associate
+           enddo
+        end associate
+     enddo
+
+! hapka: old_drake
+!     if(OrbPairSpec%istype1.neqv.PairSpec%istype1) then
+!        write(LOUT,'(a)') 'ERROR!!! &
+!             &Test 1a in check_consistency_PairReduced!'
+!        stop
+!     endif
+!     if(PairSpec%istype1) then
+!        if(OrbPairSpec%maxrange1/=PairSpec%maxrange1) then
+!           write(LOUT,'(a)') 'ERROR!!! &
+!                &Test 1b in check_consistency_PairReduced!'
+!           stop
+!        endif
+!     endif
+!
+!     if(OrbPairSpec%istype2.neqv.PairSpec%istype2) then
+!        write(LOUT,'(a)') 'ERROR!!! &
+!             &Test 2a in check_consistency_PairReduced!'
+!        stop
+!     endif
+!     if(PairSpec%istype2) then
+!        if(OrbPairSpec%n_range2/=PairSpec%n_range2) then
+!           write(LOUT,'(a)') 'ERROR!!! &
+!                &Test 2b in check_consistency_PairReduced!'
+!           stop
+!        endif
+!        if(any(OrbPairSpec%maxrange2/=PairSpec%maxrange2)) then
+!           write(LOUT,'(a)') 'ERROR!!! &
+!                &Test 2c in check_consistency_PairReduced!'
+!           stop
+!        endif
+!     endif
+!
+!     if(.not.OrbPairSpec%istype3.and.PairSpec%istype3) then
+!        write(LOUT,'(a)') 'ERROR!!! &
+!             &Test 3a in check_consistency_PairReduced!'
+!        stop
+!     endif
+!     if(PairSpec%istype3) then
+!        sOrbPair = merge(2,1,OrbPairSpec%maxrange3(3,1)==0)
+!        sPair    = merge(2,1,   PairSpec%maxrange3(3,1)==0)
+!        if((OrbPairSpec%n_range3-sOrbPair+1)/=(PairSpec%n_range3-sPair+1)) then
+!           write(LOUT,'(a)') 'ERROR!!! &
+!                &Test 3b in check_consistency_PairReduced!'
+!           stop
+!        endif
+!        if(any(OrbPairSpec%maxrange3(:,sOrbPair:)/= &
+!             PairSpec%maxrange3(:,sPair:))) then
+!           write(LOUT,'(a)') 'ERROR!!! &
+!                &Test 3c in check_consistency_PairReduced!'
+!           stop
+!        endif
+!     elseif(OrbPairSpec%istype3) then
+!        if(OrbPairSpec%n_range3/=1) then
+!           write(LOUT,'(a)') 'ERROR!!! &
+!                &Test 3b in check_consistency_PairReduced!'
+!           stop
+!        endif
+!        if(OrbPairSpec%maxrange3(3,1)/=0) then
+!           write(LOUT,'(a)') 'ERROR!!! &
+!                &Test 3c in check_consistency_PairReduced!'
+!           stop
+!        endif
+!     endif
+!
    end associate
 enddo
 
@@ -1521,20 +1645,20 @@ integer :: i
 
 Omega = 0
 
-if(PairReduced%istype1) &
-     Omega = max(Omega,PairReduced%maxrange1)
-
-if(PairReduced%istype2) then
-   do i=1,PairReduced%n_range2
-      Omega = max(Omega,sum(PairReduced%maxrange2(1:2,i)))
-   enddo
-endif
-
-if(PairReduced%istype3) then
-   do i=1,PairReduced%n_range3
-      Omega = max(Omega,sum(PairReduced%maxrange3(1:3,i)))
-   enddo
-endif
+!if(PairReduced%istype1) &
+!     Omega = max(Omega,PairReduced%maxrange1)
+!
+!if(PairReduced%istype2) then
+!   do i=1,PairReduced%n_range2
+!      Omega = max(Omega,sum(PairReduced%maxrange2(1:2,i)))
+!   enddo
+!endif
+!
+!if(PairReduced%istype3) then
+!   do i=1,PairReduced%n_range3
+!      Omega = max(Omega,sum(PairReduced%maxrange3(1:3,i)))
+!   enddo
+!endif
 
 end function maxOmega_PairReduced
 
@@ -1544,20 +1668,20 @@ integer :: maxt
 type(PairReducedData),intent(in) :: PairReduced
 integer,intent(in),optional :: smallest
 
-if(present(smallest)) then
-   maxt = smallest - 1
-else
-   maxt = 0
-endif
-
-if(PairReduced%istype1) &
-     maxt = max(maxt,PairReduced%maxrange1)
-
-if(PairReduced%istype2) &
-     maxt = max(maxt,PairReduced%maxrange2(2,PairReduced%n_range2))
-
-if(PairReduced%istype3) &
-     maxt = max(maxt,PairReduced%maxrange3(3,PairReduced%n_range3))
+!if(present(smallest)) then
+!   maxt = smallest - 1
+!else
+!   maxt = 0
+!endif
+!
+!if(PairReduced%istype1) &
+!     maxt = max(maxt,PairReduced%maxrange1)
+!
+!if(PairReduced%istype2) &
+!     maxt = max(maxt,PairReduced%maxrange2(2,PairReduced%n_range2))
+!
+!if(PairReduced%istype3) &
+!     maxt = max(maxt,PairReduced%maxrange3(3,PairReduced%n_range3))
 
 end function maxt_PairReduced
 
@@ -1568,26 +1692,26 @@ type(PairReducedData),intent(in) :: PairReduced
 integer,intent(in),optional :: smallest
 integer :: i
 
-if(present(smallest)) then
-   maxuv = smallest - 1
-else
-   maxuv = 0
-endif
-
-if(PairReduced%istype1) &
-     maxuv = max(maxuv,PairReduced%maxrange1)
-
-if(PairReduced%istype2) then
-   do i=1,PairReduced%n_range2
-      maxuv = max(maxuv,PairReduced%maxrange2(1,i))
-   enddo
-endif
-
-if(PairReduced%istype3) then
-   do i=1,PairReduced%n_range3
-      maxuv = max(maxuv,PairReduced%maxrange3(1,i),PairReduced%maxrange3(2,i))
-   enddo
-endif
+!if(present(smallest)) then
+!   maxuv = smallest - 1
+!else
+!   maxuv = 0
+!endif
+!
+!if(PairReduced%istype1) &
+!     maxuv = max(maxuv,PairReduced%maxrange1)
+!
+!if(PairReduced%istype2) then
+!   do i=1,PairReduced%n_range2
+!      maxuv = max(maxuv,PairReduced%maxrange2(1,i))
+!   enddo
+!endif
+!
+!if(PairReduced%istype3) then
+!   do i=1,PairReduced%n_range3
+!      maxuv = max(maxuv,PairReduced%maxrange3(1,i),PairReduced%maxrange3(2,i))
+!   enddo
+!endif
 
 end function maxuv_PairReduced_not
 
@@ -1599,36 +1723,36 @@ type(PairReducedData),intent(in) :: PairReduced
 integer,intent(in) :: smallest
 integer :: i
 
-maxuv = smallest - 1
-
-if(PairReduced%istype1) then
-   maxuv(1) = max(maxuv(1),PairReduced%maxrange1-t)
-   maxuv(2) = max(maxuv(2),PairReduced%maxrange1-t)
-endif
-
-if(PairReduced%istype2) then
-   do i=1,PairReduced%n_range2
-      if(PairReduced%maxrange2(2,i)==t) then
-         maxuv(1) = max(maxuv(1),PairReduced%maxrange2(1,i))
-         maxuv(2) = max(maxuv(2),PairReduced%maxrange2(1,i))
-      end if
-   enddo
-endif
-
-if(PairReduced%istype3) then
-   do i=1,PairReduced%n_range3
-      if(PairReduced%maxrange3(3,i)==t) then
-         maxuv(1) = max(maxuv(1),PairReduced%maxrange3(1,i))
-         maxuv(2) = max(maxuv(2),PairReduced%maxrange3(2,i))
-      end if
-   enddo
-endif
-
-if((maxuv(1)<smallest).neqv.(maxuv(2)<smallest)) then
-   write(LOUT,'(a)') 'ERROR!!! &
-        &Ranges of u and v cannot be determined in maxuv_PairReduced!'
-   stop
-endif
+!maxuv = smallest - 1
+!
+!if(PairReduced%istype1) then
+!   maxuv(1) = max(maxuv(1),PairReduced%maxrange1-t)
+!   maxuv(2) = max(maxuv(2),PairReduced%maxrange1-t)
+!endif
+!
+!if(PairReduced%istype2) then
+!   do i=1,PairReduced%n_range2
+!      if(PairReduced%maxrange2(2,i)==t) then
+!         maxuv(1) = max(maxuv(1),PairReduced%maxrange2(1,i))
+!         maxuv(2) = max(maxuv(2),PairReduced%maxrange2(1,i))
+!      end if
+!   enddo
+!endif
+!
+!if(PairReduced%istype3) then
+!   do i=1,PairReduced%n_range3
+!      if(PairReduced%maxrange3(3,i)==t) then
+!         maxuv(1) = max(maxuv(1),PairReduced%maxrange3(1,i))
+!         maxuv(2) = max(maxuv(2),PairReduced%maxrange3(2,i))
+!      end if
+!   enddo
+!endif
+!
+!if((maxuv(1)<smallest).neqv.(maxuv(2)<smallest)) then
+!   write(LOUT,'(a)') 'ERROR!!! &
+!        &Ranges of u and v cannot be determined in maxuv_PairReduced!'
+!   stop
+!endif
 
 end function maxuv_PairReduced_t
 
@@ -2021,49 +2145,49 @@ type(PairReducedData) :: OrbPairSpec,PairSpec
 character(39) :: line1,line2
 integer :: i
 
-call header(line1,OrbPairSpec)
-call header(line2,PairSpec)
-write(LOUT,'(3a)') line1,'||',line2
-
-if(.not.OrbPairSpec%isUsed) return
-
-if(PairSpec%istype1) then
-   call type1(line1,OrbPairSpec)
-   call type1(line2,PairSpec)
-   write(LOUT,'(3a)') line1,'||',line2
-endif
-
-if(PairSpec%istype2) then
-   do i=1,PairSpec%n_range2
-      call type2(line1,i,OrbPairSpec)
-      call type2(line2,i,PairSpec)
-      write(LOUT,'(3a)') line1,'||',line2
-   enddo
-endif
-
-if(PairSpec%istype3) then
-   if(OrbPairSpec%n_range3==PairSpec%n_range3) then
-      do i=1,PairSpec%n_range3
-         call type3(line1,i,OrbPairSpec)
-         call type3(line2,i,PairSpec)
-         write(LOUT,'(3a)') line1,'||',line2
-      enddo
-   else
-      call type3(line1,1,OrbPairSpec)
-      call type3header(line2)
-      write(LOUT,'(3a)') line1,'||',line2
-      do i=1,PairSpec%n_range3
-         call type3(line1,i+1,OrbPairSpec)
-         call type3(line2,i  ,PairSpec,.false.)
-         write(LOUT,'(3a)') line1,'||',line2
-      enddo
-   endif
-elseif(OrbPairSpec%istype3) then
-   do i=1,OrbPairSpec%n_range3
-      call type3(line1,i,OrbPairSpec)
-      write(LOUT,'(2a)') line1,'||'
-   enddo
-endif
+!call header(line1,OrbPairSpec)
+!call header(line2,PairSpec)
+!write(LOUT,'(3a)') line1,'||',line2
+!
+!if(.not.OrbPairSpec%isUsed) return
+!
+!if(PairSpec%istype1) then
+!   call type1(line1,OrbPairSpec)
+!   call type1(line2,PairSpec)
+!   write(LOUT,'(3a)') line1,'||',line2
+!endif
+!
+!if(PairSpec%istype2) then
+!   do i=1,PairSpec%n_range2
+!      call type2(line1,i,OrbPairSpec)
+!      call type2(line2,i,PairSpec)
+!      write(LOUT,'(3a)') line1,'||',line2
+!   enddo
+!endif
+!
+!if(PairSpec%istype3) then
+!   if(OrbPairSpec%n_range3==PairSpec%n_range3) then
+!      do i=1,PairSpec%n_range3
+!         call type3(line1,i,OrbPairSpec)
+!         call type3(line2,i,PairSpec)
+!         write(LOUT,'(3a)') line1,'||',line2
+!      enddo
+!   else
+!      call type3(line1,1,OrbPairSpec)
+!      call type3header(line2)
+!      write(LOUT,'(3a)') line1,'||',line2
+!      do i=1,PairSpec%n_range3
+!         call type3(line1,i+1,OrbPairSpec)
+!         call type3(line2,i  ,PairSpec,.false.)
+!         write(LOUT,'(3a)') line1,'||',line2
+!      enddo
+!   endif
+!elseif(OrbPairSpec%istype3) then
+!   do i=1,OrbPairSpec%n_range3
+!      call type3(line1,i,OrbPairSpec)
+!      write(LOUT,'(2a)') line1,'||'
+!   enddo
+!endif
 
 contains
 
@@ -2089,7 +2213,7 @@ contains
   character(*) :: line
   type(PairReducedData) :: PairSpec
 
-  write(line,'(14x,a,2x,i3)') 'TYPE1',PairSpec%maxrange1
+!  write(line,'(14x,a,2x,i3)') 'TYPE1',PairSpec%maxrange1
 
   end subroutine type1
 
@@ -2099,8 +2223,8 @@ contains
   integer :: irange
   type(PairReducedData) :: PairSpec
 
-  write(line,'(14x,a,2x,2i3)') &
-       merge('TYPE2','     ',irange==1),PairSpec%maxrange2(:,irange)
+!  write(line,'(14x,a,2x,2i3)') &
+!       merge('TYPE2','     ',irange==1),PairSpec%maxrange2(:,irange)
 
   end subroutine type2
 
@@ -2108,7 +2232,7 @@ contains
   implicit none
   character(*) :: line
 
-  write(line,'(14x,a,2x,3(2x,"-"))') 'TYPE3'
+!  write(line,'(14x,a,2x,3(2x,"-"))') 'TYPE3'
 
   end subroutine type3header
 
@@ -2126,9 +2250,9 @@ contains
      modifier = .true.
   endif
 
-  write(line,'(14x,a,2x,3i3)') &
-       merge('TYPE3','     ',irange==1.and.modifier),&
-       PairSpec%maxrange3(:,irange)
+!  write(line,'(14x,a,2x,3i3)') &
+!       merge('TYPE3','     ',irange==1.and.modifier),&
+!       PairSpec%maxrange3(:,irange)
 
   end subroutine type3
 

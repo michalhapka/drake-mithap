@@ -20,7 +20,7 @@ call read_Input(Input)
 call fill_Control(Control,Input)
 call create_System(System,Input,Control)
 call free_Input(Input)
-!call calculate(System,Control)
+call calculate(System,Control)
 
 call free_System(System)
 call mem_report

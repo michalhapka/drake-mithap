@@ -23,6 +23,7 @@ integer,allocatable :: n_orbs(:)
 integer :: n_pairs
 integer :: maxprim_orbs,maxprim_pairs
 integer :: sumprim_orbs,sumprim_pairs
+integer :: sumorb_pairs
 integer :: nprim_orbs,nprim_pairs
 integer :: Neta
 integer :: Nexp_orig,Nexp
@@ -428,7 +429,8 @@ integer :: i,j,k,l
  System%NumGen       = NumGen
  System%Neta         = Neta
  System%Nexp         = Nexp
- System%NexpSQ       = System%Nexp*(System%Nexp + 1)/2
+!System%NexpSQ       = System%Nexp*(System%Nexp + 1)/2
+ System%NexpSQ       = System%Nexp**2
 
  call mem_alloc(System%norb        ,System%maxl+1)
  call mem_alloc(System%n_orbs      ,System%maxl+1)
@@ -575,7 +577,6 @@ integer :: i,j,k,l
 ! enddo
 ! 
  call sort_prim(sumprim_orbs,prim_all,diff_all,2,compare_prim_orbs)
- !call reduce_prim(sumprim_orbs,prim_all,diff_all)
  call reduce_prim(sumprim_orbs,prim_all,diff_all,3)
 ! call reduce_prim_l(sumprim_orbs,prim_all,diff_all)
  call sort_prim(sumprim_orbs,prim_all,diff_l,3,compare_prim_orbs)
@@ -603,10 +604,11 @@ integer :: i,j,k,l
  call mem_dealloc(prim)
  
  if(System%post_SCF) then
- 
-    sumprim_pairs = sumprim_pairs + sumprim_orbs**2
+
+    call check_OrbPairNum(sumorb_pairs,System%Nexp,System%OrbReduced)
+    sumprim_pairs = sumprim_pairs + sumorb_pairs
 !   sumprim_pairs = sumprim_pairs + sumprim_orbs*(sumprim_orbs + 1)/2
- 
+    print *, sumprim_pairs,sumorb_pairs,sumprim_orbs
     call mem_alloc(prim,6,maxprim_pairs)
     call mem_alloc(prim_all,7,sumprim_pairs)
     call mem_alloc(diff,maxprim_pairs)
@@ -677,8 +679,18 @@ integer :: i,j,k,l
     order_tmp = System%Nexp*1000 
     call sort_prim(sumprim_pairs,prim_all,diff_all,order_tmp,compare_prim_pairs)
     call reduce_prim(sumprim_pairs,prim_all,diff_all,7)
-  ! hapka: 1) any smart checking of reduce_prim?
-  !        2) next: create_PairReduced
+    call create_PairReduced(System%PairReduced,&
+         sumprim_pairs,prim_all,diff_all,System%Nexp,System%isUsed_pairs)
+
+    call add_OrbReduced(sumprim_pairs,prim_all,System%Nexp,System%OrbReduced)
+    call sort_prim(sumprim_pairs,prim_all,diff_all,order_tmp,compare_prim_pairs)
+    call reduce_prim(sumprim_pairs,prim_all,diff_all,7)
+    call create_PairReduced(System%OrbPairReduced,&
+         sumprim_pairs,prim_all,diff_all,System%Nexp,System%isUsed_pairs)
+
+    call check_consistency_PairReduced(System%NexpSQ,&
+         System%OrbPairReduced,System%PairReduced)
+
 ! hapka: old_drake
 !    call mem_alloc(expSQ_restrict,System%NexpSQ)
 !    i = 0
@@ -741,8 +753,6 @@ integer :: i,j,k,l
 !       enddo
 !    enddo
 ! 
-! DOTAD TRWALA ANALIZA (Sturm und Drang!)
-!
 !    call sort_prim(sumprim_pairs,prim_all,diff_all,compare_prim_pairs)
 !    call reduce_prim(sumprim_pairs,prim_all,diff_all)
 !    call create_PairReduced(System%PairReduced,&
@@ -1062,29 +1072,127 @@ enddo
 
 end subroutine create_OrbReduced_l
 
+subroutine check_OrbPairNum(n,Nexp,OrbReduced)
+implicit none
+integer :: n
+integer,intent(in) :: Nexp
+type(OrbReducedData),intent(in) :: OrbReduced(:)
+integer :: get_gen_orb(1:3) = [2,4,6]
+integer :: i,j,k,l,iorb
+
+n = 0
+do j=1,Nexp
+   do i=1,Nexp
+      associate(OrbReduced1 => OrbReduced(i), OrbReduced2 => OrbReduced(j))
+        if(OrbReduced1%isUsed.and.OrbReduced2%isUsed) then
+           do k=1,OrbReduced1%nlang 
+              do l=1,OrbReduced2%nlang
+                 if((OrbReduced1%lang(k).eq.OrbReduced2%lang(l)) &
+                     .and.(OrbReduced1%iexp.le.OrbReduced2%iexp)) then
+                    select case(OrbReduced1%lang(k))
+                    case(0)
+                       n = n + 1
+                    case(1)
+                       do iorb=1,3 
+                          n = n + 1
+                       enddo
+                    end select
+                 elseif(OrbReduced1%lang(k).lt.OrbReduced2%lang(l)) then
+                       n = n + 1
+                 endif
+              enddo
+           enddo
+        endif
+      end associate
+   enddo
+enddo
+
+end subroutine check_OrbPairNum
+
 subroutine add_OrbReduced(n,prim,Nexp,OrbReduced)
 implicit none
 integer :: n
 integer :: prim(:,:)
 integer,intent(in) :: Nexp
 type(OrbReducedData),intent(in) :: OrbReduced(:)
-integer :: i,j
+integer :: get_gen_orb(1:3) = [2,4,6]
+integer :: i,j,k,l,iorb
 
 do j=1,Nexp
-   do i=1,j
+   do i=1,Nexp
       associate(OrbReduced1 => OrbReduced(i), OrbReduced2 => OrbReduced(j))
         if(OrbReduced1%isUsed.and.OrbReduced2%isUsed) then
-           n = n + 1
-           prim(1,n) = OrbReduced1%iexp
-           prim(2,n) = OrbReduced2%iexp
-           prim(3,n) = 3
-           prim(4,n) = OrbReduced1%maxrange
-           prim(5,n) = OrbReduced2%maxrange
-           prim(6,n) = 0
+           do k=1,OrbReduced1%nlang 
+              do l=1,OrbReduced2%nlang
+                 if((OrbReduced1%lang(k).eq.OrbReduced2%lang(l)) &
+                     .and.(OrbReduced1%iexp.le.OrbReduced2%iexp)) then
+                    select case(OrbReduced1%lang(k))
+                    case(0)
+                       !write(*,*) 'case 0',OrbReduced1%iexp,OrbReduced2%iexp
+                       !write(*,*) 'case 0',OrbReduced1%lang(k),OrbReduced2%lang(l)
+                       !write(*,*) 'case 0',OrbReduced1%max_lrange(k),OrbReduced2%max_lrange(l)
+                       !write(*,*) ''
+                       n = n + 1
+                       prim(1,n) = OrbReduced1%iexp
+                       prim(2,n) = OrbReduced2%iexp
+                       prim(3,n) = 3
+                       prim(4,n) = OrbReduced1%max_lrange(k)
+                       prim(5,n) = OrbReduced2%max_lrange(l)
+                       prim(6,n) = 0
+                       ! S^E
+                       prim(7,n) = 1  
+                    case(1)
+                       !write(*,*) 'case 1-exp',OrbReduced1%iexp,OrbReduced2%iexp
+                       !write(*,*) 'case 1-ang',OrbReduced1%lang(k),OrbReduced2%lang(l)
+                       !write(*,*) 'case 1-lrg',OrbReduced1%max_lrange(k),OrbReduced2%max_lrange(l)
+                       do iorb=1,3 
+                          n = n + 1
+                          prim(1,n) = OrbReduced1%iexp
+                          prim(2,n) = OrbReduced2%iexp
+                          prim(3,n) = 3
+                          prim(4,n) = OrbReduced1%max_lrange(k)-OrbReduced1%lang(k)
+                          prim(5,n) = OrbReduced2%max_lrange(l)-OrbReduced2%lang(l)
+                          prim(6,n) = 0
+                          prim(7,n) = get_gen_orb(iorb)
+                       enddo
+                    end select
+                 elseif(OrbReduced1%lang(k).lt.OrbReduced2%lang(l)) then
+                    !write(*,*) 'mix -exp',OrbReduced1%iexp,OrbReduced2%iexp
+                    !write(*,*) 'mix -ang',OrbReduced1%lang(k),OrbReduced2%lang(l)
+                    !write(*,*) 'mix -lrg',OrbReduced1%max_lrange(k),OrbReduced2%max_lrange(l)
+                    !write(*,*) ''
+                       n = n + 1
+                       prim(1,n) = OrbReduced1%iexp
+                       prim(2,n) = OrbReduced2%iexp
+                       prim(3,n) = 3
+                       prim(4,n) = OrbReduced1%max_lrange(k)-OrbReduced1%lang(k)
+                       prim(5,n) = OrbReduced2%max_lrange(l)-OrbReduced2%lang(l)
+                       prim(6,n) = 0
+                       ! P^O
+                       prim(7,n) = 3  
+                 endif
+              enddo
+           enddo
         endif
       end associate
    enddo
 enddo
+
+!do j=1,Nexp
+!   do i=1,j
+!      associate(OrbReduced1 => OrbReduced(i), OrbReduced2 => OrbReduced(j))
+!        if(OrbReduced1%isUsed.and.OrbReduced2%isUsed) then
+!           n = n + 1
+!           prim(1,n) = OrbReduced1%iexp
+!           prim(2,n) = OrbReduced2%iexp
+!           prim(3,n) = 3
+!           prim(4,n) = OrbReduced1%maxrange
+!           prim(5,n) = OrbReduced2%maxrange
+!           prim(6,n) = 0
+!        endif
+!      end associate
+!   enddo
+!enddo
 
 end subroutine add_OrbReduced
 
@@ -1259,33 +1367,206 @@ PairSystem%nbas = offset
 
 end subroutine create_PairSystem
 
+! hapka: old_drake
+!subroutine create_PairReduced(PairReduced,n,prim,diff,Nexp,isUsed)
+!implicit none
+!type(PairReducedData) :: PairReduced(:)
+!integer,intent(in) :: n
+!integer,intent(in) :: prim(:,:),diff(:)
+!integer,intent(in) :: Nexp
+!logical,intent(in) :: isUsed(:)
+!integer :: icnt,istart,iend
+!integer :: jcnt,jstart,jend
+!integer :: iexp1,iexp2,iexpSQ,itype
+!integer :: n_range
+!integer :: i,j,k
+!
+!icnt = 0
+!istart = 1
+!do while(istart<=n)
+!   icnt = icnt + 1
+!   iend = find_end(istart,n,diff,6)
+!   !iend = find_end(istart,n,diff,10)
+!
+!   iexp1 = prim(1,istart)
+!   iexp2 = prim(2,istart)
+!   if(iexp1>iexp2) then
+!      write(LOUT,'(a)') 'ERROR!!! &
+!           &Incorrect exponents order in create_PairReduced!'
+!      stop
+!   endif
+!   iexpSQ = iexp1 + (iexp2 - 1)*iexp2/2
+!
+!   do i=istart+1,iend
+!      if(prim(1,i)/=iexp1.or.prim(2,i)/=iexp2) then
+!         write(LOUT,'(a)') 'ERROR!!! &
+!              &Incorrect recognition of pair primitive in create_PairReduced!'
+!         stop
+!      endif
+!   enddo
+!
+!   associate(PairSpec => PairReduced(iexpSQ))
+!
+!     PairSpec%isUsed = .true.
+!     PairSpec%iexp1  = iexp1
+!     PairSpec%iexp2  = iexp2
+!     PairSpec%iexpSQ = iexpSQ
+!
+!!    find_end(jstart,iend,diff,4)
+!
+!     jcnt = 0
+!     jstart = istart
+!     do while(jstart<=iend)
+!        jcnt = jcnt + 1
+!        jend = find_end(jstart,iend,diff,2)
+!        !jend = find_end(jstart,iend,diff,5)
+!
+!        itype = prim(3,jstart)
+!
+!        do j=jstart+1,jend
+!           if(prim(3,j)/=itype) then
+!              write(LOUT,'(a)') 'ERROR!!! &
+!                   &Incorrect recognition of type in create_PairReduced!'
+!              stop
+!           endif
+!        enddo
+!
+!        n_range = jend - jstart + 1
+!
+!        select case(itype)
+!        case(1)
+!
+!           if(PairSpec%istype1) then
+!              write(LOUT,'(a)') 'ERROR!!! &
+!                   &Second occurence of itype = 1 in create_PairReduced!'
+!              stop
+!           endif
+!           if(n_range>1) then
+!              write(LOUT,'(a)') 'ERROR!!! &
+!                   &More than one range specification for itype = 1 !'
+!              stop
+!           endif
+!
+!           PairSpec%istype1   = .true.
+!           PairSpec%maxrange1 = prim(4,jstart)
+!
+!        case(2)
+!
+!           if(PairSpec%istype2) then
+!              write(LOUT,'(a)') 'ERROR!!! &
+!                   &Second occurence of itype = 2 in create_PairReduced!'
+!              stop
+!           endif
+!
+!           PairSpec%istype2  = .true.
+!           PairSpec%n_range2 = n_range
+!
+!           call mem_alloc(PairSpec%maxrange2,2,PairSpec%n_range2)
+!           do j=1,PairSpec%n_range2
+!              PairSpec%maxrange2(:,j) = prim(4:5,jstart+j-1)
+!           enddo
+!
+!        case(3)
+!
+!           if(PairSpec%istype3) then
+!              write(LOUT,'(a)') 'ERROR!!! &
+!                   &Second occurence of itype = 3 in create_PairReduced!'
+!              stop
+!           endif
+!
+!           PairSpec%istype3  = .true.
+!           PairSpec%n_range3 = n_range
+!
+!           call mem_alloc(PairSpec%maxrange3,3,PairSpec%n_range3)
+!           do j=1,PairSpec%n_range3
+!              PairSpec%maxrange3(:,j) = prim(4:6,jstart+j-1)
+!           enddo
+!
+!        case default
+!
+!           write(LOUT,'(a)') 'ERROR!!! &
+!                &Incorrect range type specification in create_PairReduced!'
+!           stop
+!
+!        end select
+!
+!        jstart = jend + 1
+!     enddo
+!     if(jcnt/=count(mod(diff(istart:iend),5)==1)) then
+!        write(LOUT,'(a)') 'ERROR!!! &
+!             &Number of types was incorrectly predicted in create_PairReduced!'
+!        stop
+!     endif
+!
+!   end associate
+!
+!   istart = iend + 1
+!enddo
+!if(icnt/=count(diff(1:n)==1)) then
+!   write(LOUT,'(a)') 'ERROR!!! &
+!        &Number of prim pairs was incorrectly predicted in create_PairReduced!'
+!   stop
+!endif
+!
+!i=0
+!do k=1,Nexp
+!   do j=1,k
+!      i = i + 1
+!      if(PairReduced(i)%isUsed) then
+!         if(.not.(isUsed(j).and.isUsed(k))) then
+!            write(LOUT,'(a)') 'ERROR!!! &
+!                 &Used pair exponents have not been predicted properly!'
+!            stop
+!         endif
+!      endif
+!   enddo
+!enddo
+!
+!end subroutine create_PairReduced
+
 subroutine create_PairReduced(PairReduced,n,prim,diff,Nexp,isUsed)
 implicit none
 type(PairReducedData) :: PairReduced(:)
 integer,intent(in) :: n
 integer,intent(in) :: prim(:,:),diff(:)
 integer,intent(in) :: Nexp
-logical,intent(in) :: isUsed(:)
+logical,intent(in) :: isUsed(:,:)
 integer :: icnt,istart,iend
 integer :: jcnt,jstart,jend
+integer :: kcnt,kstart,kend
 integer :: iexp1,iexp2,iexpSQ,itype
 integer :: n_range
+integer :: n_gen, igen
 integer :: i,j,k
+
+
+! ordering: 1=exp, 3=type, 5=gen
+!              i    k    j 
+!              1    3    5
+!            ---------------
+!   mod(.,6) | 1    3    5 | 
+!   mod(.,4) | 1    3    1 | 
+!   mod(.,2) | 1    1    1 | 
+!            ---------------
 
 icnt = 0
 istart = 1
 do while(istart<=n)
    icnt = icnt + 1
-   iend = find_end(istart,n,diff,10)
+   iend = find_end(istart,n,diff,6)
 
    iexp1 = prim(1,istart)
    iexp2 = prim(2,istart)
-   if(iexp1>iexp2) then
-      write(LOUT,'(a)') 'ERROR!!! &
-           &Incorrect exponents order in create_PairReduced!'
-      stop
-   endif
-   iexpSQ = iexp1 + (iexp2 - 1)*iexp2/2
+!   if(iexp1>iexp2) then
+!      write(LOUT,'(a)') 'ERROR!!! &
+!           &Incorrect exponents order in create_PairReduced!'
+!      stop
+!   endif
+
+! triangle
+!   iexpSQ = iexp1 + (iexp2 - 1)*iexp2/2
+! square
+   iexpSQ = iexp1 + (iexp2 - 1)*Nexp
 
    do i=istart+1,iend
       if(prim(1,i)/=iexp1.or.prim(2,i)/=iexp2) then
@@ -1295,93 +1576,122 @@ do while(istart<=n)
       endif
    enddo
 
+   n_gen = count(mod(diff(istart:iend),5)==0) + 1
+
    associate(PairSpec => PairReduced(iexpSQ))
 
      PairSpec%isUsed = .true.
      PairSpec%iexp1  = iexp1
      PairSpec%iexp2  = iexp2
      PairSpec%iexpSQ = iexpSQ
+     PairSpec%n_gen  = n_gen
 
+     allocate(PairSpec%PairReduced_G(n_gen))
+     do i=1,PairSpec%n_gen
+        call init_PairReduced_G(PairSpec%PairReduced_G(i))
+     enddo
+ 
      jcnt = 0
      jstart = istart
+     ! loop over generators
      do while(jstart<=iend)
         jcnt = jcnt + 1
-        jend = find_end(jstart,iend,diff,5)
+        jend = find_end(jstart,iend,diff,4)
 
-        itype = prim(3,jstart)
+        associate(PairSpecG => PairSpec%PairReduced_G(jcnt))
+          
+          igen = prim(7,jstart)
+          PairSpecG%gen_type = igen
 
-        do j=jstart+1,jend
-           if(prim(3,j)/=itype) then
-              write(LOUT,'(a)') 'ERROR!!! &
-                   &Incorrect recognition of type in create_PairReduced!'
-              stop
-           endif
-        enddo
+          kcnt = 0
+          kstart = jstart 
+          ! loop over types
+          do while(kstart<=jend)
+             kcnt = kcnt + 1
+             kend = find_end(kstart,jend,diff,2)
+             itype = prim(3,kstart)
 
-        n_range = jend - jstart + 1
+             do k=kstart+1,kend
+                if(prim(3,k)/=itype) then
+                   write(LOUT,'(a)') 'ERROR!!! &
+                        &Incorrect recognition of type in create_PairReduced!'
+                   stop
+                endif
+             enddo
 
-        select case(itype)
-        case(1)
+             n_range = kend - kstart + 1
 
-           if(PairSpec%istype1) then
-              write(LOUT,'(a)') 'ERROR!!! &
-                   &Second occurence of itype = 1 in create_PairReduced!'
-              stop
-           endif
-           if(n_range>1) then
-              write(LOUT,'(a)') 'ERROR!!! &
-                   &More than one range specification for itype = 1 !'
-              stop
-           endif
+             select case(itype)
+             case(1)
 
-           PairSpec%istype1   = .true.
-           PairSpec%maxrange1 = prim(4,jstart)
+             if(PairSpecG%istype1) then
+                write(LOUT,'(a)') 'ERROR!!! &
+                     &Second occurence of itype = 1 in create_PairReduced!'
+                stop
+             endif
+             if(n_range>1) then
+                write(LOUT,'(a)') 'ERROR!!! &
+                     &More than one range specification for itype = 1 !'
+                stop
+             endif
+  
+             PairSpecG%istype1   = .true.
+             PairSpecG%maxrange1 = prim(4,jstart)
 
-        case(2)
+             case(2)
 
-           if(PairSpec%istype2) then
-              write(LOUT,'(a)') 'ERROR!!! &
-                   &Second occurence of itype = 2 in create_PairReduced!'
-              stop
-           endif
+             if(PairSpecG%istype2) then
+                write(LOUT,'(a)') 'ERROR!!! &
+                     &Second occurence of itype = 2 in create_PairReduced!'
+                stop
+             endif
+  
+             PairSpecG%istype2  = .true.
+             PairSpecG%n_range2 = n_range
+  
+             call mem_alloc(PairSpecG%maxrange2,2,PairSpecG%n_range2)
+             do k=1,PairSpecG%n_range2
+                PairSpecG%maxrange2(:,k) = prim(4:5,kstart+k-1)
+             enddo
 
-           PairSpec%istype2  = .true.
-           PairSpec%n_range2 = n_range
+             case(3)
 
-           call mem_alloc(PairSpec%maxrange2,2,PairSpec%n_range2)
-           do j=1,PairSpec%n_range2
-              PairSpec%maxrange2(:,j) = prim(4:5,jstart+j-1)
-           enddo
+             if(PairSpecG%istype3) then
+                write(LOUT,'(a)') 'ERROR!!! &
+                     &Second occurence of itype = 3 in create_PairReduced!'
+                stop
+             endif
+  
+             PairSpecG%istype3  = .true.
+             PairSpecG%n_range3 = n_range
+  
+             call mem_alloc(PairSpecG%maxrange3,3,PairSpecG%n_range3)
+             do k=1,PairSpecG%n_range3
+                PairSpecG%maxrange3(:,k) = prim(4:6,kstart+k-1)
+             enddo
 
-        case(3)
+             case default
 
-           if(PairSpec%istype3) then
-              write(LOUT,'(a)') 'ERROR!!! &
-                   &Second occurence of itype = 3 in create_PairReduced!'
-              stop
-           endif
+             write(LOUT,'(a)') 'ERROR!!! &
+                  &Incorrect range type specification in create_PairReduced!'
+             stop
 
-           PairSpec%istype3  = .true.
-           PairSpec%n_range3 = n_range
+             end select
 
-           call mem_alloc(PairSpec%maxrange3,3,PairSpec%n_range3)
-           do j=1,PairSpec%n_range3
-              PairSpec%maxrange3(:,j) = prim(4:6,jstart+j-1)
-           enddo
+             kstart = kend + 1 
+          enddo
+          if(kcnt/=count(mod(diff(jstart:jend),2)==1)) then
+             write(LOUT,'(a)') 'ERROR!!! &
+                  &Number of types was incorrectly predicted in create_PairReduced!'
+             stop
+          endif
 
-        case default
-
-           write(LOUT,'(a)') 'ERROR!!! &
-                &Incorrect range type specification in create_PairReduced!'
-           stop
-
-        end select
-
-        jstart = jend + 1
+          jstart = jend + 1
+        end associate
      enddo
-     if(jcnt/=count(mod(diff(istart:iend),5)==1)) then
+     if(jcnt/=count(mod(diff(istart:iend),4)==1)) then
         write(LOUT,'(a)') 'ERROR!!! &
-             &Number of types was incorrectly predicted in create_PairReduced!'
+             &Number of generators was incorrectly predicted in create_PairReduced!'
         stop
      endif
 
@@ -1395,12 +1705,11 @@ if(icnt/=count(diff(1:n)==1)) then
    stop
 endif
 
-i=0
-do k=1,Nexp
-   do j=1,k
-      i = i + 1
+do j=1,Nexp
+   do k=1,Nexp
+      i = j + (k - 1)*Nexp 
       if(PairReduced(i)%isUsed) then
-         if(.not.(isUsed(j).and.isUsed(k))) then
+         if(.not.(any(isUsed(j,:)).and.(any(isUsed(k,:))))) then
             write(LOUT,'(a)') 'ERROR!!! &
                  &Used pair exponents have not been predicted properly!'
             stop
