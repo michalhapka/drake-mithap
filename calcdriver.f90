@@ -22,20 +22,21 @@ contains
  real(prec),allocatable :: optimize(:)
  
  if(System%post_SCF) then
-! 
-!    call init_SCForbitals(SCForbitals,System)
-! 
-!    write(LOUT,'()')
-!    write(LOUT,'(5x,a)') '--- SCF calculation ---'
-!    call calculateSCF(System,Control,SCForbitals)
-!    if(Control%LPRINT>=5) call print_SCForbitals(SCForbitals,System)
-! 
-!    call print_EndSection
-! 
-!    call CC_fix_SCForbitals(SCForbitals)
-!    if(System%optimize) then
-! 
-!       write(LOUT,'()')
+ 
+    call init_SCForbitals(SCForbitals,System)
+ 
+    write(LOUT,'()')
+    write(LOUT,'(5x,a)') '--- SCF calculation ---'
+    call calculateSCF(System,Control,SCForbitals)
+    if(Control%LPRINT>=5) call print_SCForbitals(SCForbitals,System)
+ 
+    call print_EndSection
+ 
+    call CC_fix_SCForbitals(SCForbitals)
+    if(System%optimize) then
+ 
+       write(LOUT,'()')
+       write(LOUT,'(a)') 'NON AVAILABLE!'
 !       write(LOUT,'(5x,3a)') &
 !            '--- Initial ',&
 !            trim(System%calc_type(1:index(System%calc_type,'OPT')-1)),&
@@ -62,17 +63,17 @@ contains
 ! 
 !       call print_SystemExponents(System)
 ! 
-!    else
-! 
-!       write(LOUT,'()')
-!       write(LOUT,'(5x,3a)') '--- ',trim(System%calc_type),' calculation ---'
-!       call calculateCC(System,Control)
-! 
-!    endif
-!    call CC_release_SCForbitals
-! 
-!    call free_SCForbitals(SCForbitals)
-! 
+    else
+ 
+       write(LOUT,'()')
+       write(LOUT,'(5x,3a)') '--- ',trim(System%calc_type),' calculation ---'
+       call calculateCC(System,Control)
+ 
+    endif
+    call CC_release_SCForbitals
+ 
+    call free_SCForbitals(SCForbitals,System%maxl)
+ 
  else
  
     if(System%optimize) then

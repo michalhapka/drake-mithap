@@ -320,7 +320,46 @@ if(fullPRINT) then
 endif
 
 RESULT_energy = energy
-!
+
+if(associated(RESULT_extend)) then
+   RESULT_extend%energy = energy
+   do i=0,maxl
+      associate(& 
+         OrbE => problem_l(i+1)%OrbE, &
+         OrbC => problem_l(i+1)%OrbC, &
+         nbas => nbas(i+1),&
+         norb => norb(i+1) )
+
+         RESULT_extend%SCForb_l(i+1)%HOMO = OrbE(norb)
+         if(nbas>norb) then
+            RESULT_extend%SCForb_l(i+1)%LUMO = OrbE(norb+1)
+         else
+            RESULT_extend%SCForb_l(i+1)%LUMO = 0._prec
+         endif
+         !RESULT_extend%SCForb_l(i+1)%LUMO = merge(OrbE(norb+1),0._prec,nbas>norb)
+         RESULT_extend%SCForb_l(i+1)%orb_energy(1:norb) = OrbE(1:norb)
+         RESULT_extend%SCForb_l(i+1)%orb_vector(1:nbas,1:norb) = OrbC(1:nbas,1:norb)
+     end associate
+   enddo
+!   ij2 = 0
+!   do j2=1,norb
+!      do i2=1,j2
+!         ij2 = ij2 + 1
+!         do j1=1,norb
+!            do i1=1,norb
+!               RESULT_extend%pair_energy(i1,j1,ij2) = make_contract(&
+!                    nbas,RESULT_extend%orb_vector(:,i1),&
+!                    nbas,RESULT_extend%orb_vector(:,i2),&
+!                    nbas,RESULT_extend%orb_vector(:,j1),&
+!                    nbas,RESULT_extend%orb_vector(:,j2),&
+!                    twoel,dens)
+!            enddo
+!         enddo
+!      enddo
+!   enddo
+endif
+
+! hapka: old_drake
 !if(associated(RESULT_extend)) then
 !   RESULT_extend%energy = energy
 !   RESULT_extend%HOMO = eval(norb)
@@ -639,17 +678,17 @@ endif
 
 RESULT_energy = energy
 
-if(associated(RESULT_extend)) then
-   RESULT_extend%energy = energy
-   RESULT_extend%HOMO = max(energy1,energy2)
-   RESULT_extend%LUMO = min(&
-        merge(eval1(2),0._prec,nbas1>2),&
-        merge(eval2(2),0._prec,nbas2>2))
-   RESULT_extend%orb_energy(1) = energy1
-   RESULT_extend%orb_energy(2) = energy2
-   RESULT_extend%orb_vector(1:nbas1,1) = vector1
-   RESULT_extend%orb_vector(1:nbas2,2) = vector2
-endif
+!if(associated(RESULT_extend)) then
+!   RESULT_extend%energy = energy
+!   RESULT_extend%HOMO = max(energy1,energy2)
+!   RESULT_extend%LUMO = min(&
+!        merge(eval1(2),0._prec,nbas1>2),&
+!        merge(eval2(2),0._prec,nbas2>2))
+!   RESULT_extend%orb_energy(1) = energy1
+!   RESULT_extend%orb_energy(2) = energy2
+!   RESULT_extend%orb_vector(1:nbas1,1) = vector1
+!   RESULT_extend%orb_vector(1:nbas2,2) = vector2
+!endif
 
 call mem_dealloc(matSmod)
 call mem_dealloc(matFmod)
@@ -682,64 +721,64 @@ if(associated(RESULT_extend)) then
    call create_SCFint(Nexp,exponents,OrbReduced,0)
 
 !   call SCFint_matJ(twoel,OrbSystem(1),OrbSystem(1),OrbSystem(1),OrbSystem(1))
-   energy = make_contract(&
-        nbas1,RESULT_extend%orb_vector(:,1),&
-        nbas1,RESULT_extend%orb_vector(:,1),&
-        nbas1,RESULT_extend%orb_vector(:,1),&
-        nbas1,RESULT_extend%orb_vector(:,1),&
-        twoel,dens)
-   RESULT_extend%pair_energy(1,1,1) = energy
-
-!   call SCFint_matJ(twoel,OrbSystem(1),OrbSystem(1),OrbSystem(1),OrbSystem(2))
-   energy = make_contract(&
-        nbas1,RESULT_extend%orb_vector(:,1),&
-        nbas1,RESULT_extend%orb_vector(:,1),&
-        nbas1,RESULT_extend%orb_vector(:,1),&
-        nbas2,RESULT_extend%orb_vector(:,2),&
-        twoel,dens)
-   RESULT_extend%pair_energy(2,1,1) = energy
-   RESULT_extend%pair_energy(1,2,1) = energy
-   RESULT_extend%pair_energy(1,1,2) = energy
-
-!   call SCFint_matJ(twoel,OrbSystem(1),OrbSystem(2),OrbSystem(1),OrbSystem(2))
-   energy = make_contract(&
-        nbas1,RESULT_extend%orb_vector(:,1),&
-        nbas2,RESULT_extend%orb_vector(:,2),&
-        nbas1,RESULT_extend%orb_vector(:,1),&
-        nbas2,RESULT_extend%orb_vector(:,2),&
-        twoel,dens)
-   RESULT_extend%pair_energy(2,2,1) = energy
-   RESULT_extend%pair_energy(2,1,2) = energy
-   RESULT_extend%pair_energy(1,1,3) = energy
-
-!   call SCFint_matJ(twoel,OrbSystem(1),OrbSystem(1),OrbSystem(2),OrbSystem(2))
-   energy = make_contract(&
-        nbas1,RESULT_extend%orb_vector(:,1),&
-        nbas1,RESULT_extend%orb_vector(:,1),&
-        nbas2,RESULT_extend%orb_vector(:,2),&
-        nbas2,RESULT_extend%orb_vector(:,2),&
-        twoel,dens)
-   RESULT_extend%pair_energy(1,2,2) = energy
-
-!   call SCFint_matJ(twoel,OrbSystem(1),OrbSystem(2),OrbSystem(2),OrbSystem(2))
-   energy = make_contract(&
-        nbas1,RESULT_extend%orb_vector(:,1),&
-        nbas2,RESULT_extend%orb_vector(:,2),&
-        nbas2,RESULT_extend%orb_vector(:,2),&
-        nbas2,RESULT_extend%orb_vector(:,2),&
-        twoel,dens)
-   RESULT_extend%pair_energy(2,2,2) = energy
-   RESULT_extend%pair_energy(2,1,3) = energy
-   RESULT_extend%pair_energy(1,2,3) = energy
-
-!   call SCFint_matJ(twoel,OrbSystem(2),OrbSystem(2),OrbSystem(2),OrbSystem(2))
-   energy = make_contract(&
-        nbas2,RESULT_extend%orb_vector(:,2),&
-        nbas2,RESULT_extend%orb_vector(:,2),&
-        nbas2,RESULT_extend%orb_vector(:,2),&
-        nbas2,RESULT_extend%orb_vector(:,2),&
-        twoel,dens)
-   RESULT_extend%pair_energy(2,2,3) = energy
+!   energy = make_contract(&
+!        nbas1,RESULT_extend%orb_vector(:,1),&
+!        nbas1,RESULT_extend%orb_vector(:,1),&
+!        nbas1,RESULT_extend%orb_vector(:,1),&
+!        nbas1,RESULT_extend%orb_vector(:,1),&
+!        twoel,dens)
+!   RESULT_extend%pair_energy(1,1,1) = energy
+!
+!!   call SCFint_matJ(twoel,OrbSystem(1),OrbSystem(1),OrbSystem(1),OrbSystem(2))
+!   energy = make_contract(&
+!        nbas1,RESULT_extend%orb_vector(:,1),&
+!        nbas1,RESULT_extend%orb_vector(:,1),&
+!        nbas1,RESULT_extend%orb_vector(:,1),&
+!        nbas2,RESULT_extend%orb_vector(:,2),&
+!        twoel,dens)
+!   RESULT_extend%pair_energy(2,1,1) = energy
+!   RESULT_extend%pair_energy(1,2,1) = energy
+!   RESULT_extend%pair_energy(1,1,2) = energy
+!
+!!   call SCFint_matJ(twoel,OrbSystem(1),OrbSystem(2),OrbSystem(1),OrbSystem(2))
+!   energy = make_contract(&
+!        nbas1,RESULT_extend%orb_vector(:,1),&
+!        nbas2,RESULT_extend%orb_vector(:,2),&
+!        nbas1,RESULT_extend%orb_vector(:,1),&
+!        nbas2,RESULT_extend%orb_vector(:,2),&
+!        twoel,dens)
+!   RESULT_extend%pair_energy(2,2,1) = energy
+!   RESULT_extend%pair_energy(2,1,2) = energy
+!   RESULT_extend%pair_energy(1,1,3) = energy
+!
+!!   call SCFint_matJ(twoel,OrbSystem(1),OrbSystem(1),OrbSystem(2),OrbSystem(2))
+!   energy = make_contract(&
+!        nbas1,RESULT_extend%orb_vector(:,1),&
+!        nbas1,RESULT_extend%orb_vector(:,1),&
+!        nbas2,RESULT_extend%orb_vector(:,2),&
+!        nbas2,RESULT_extend%orb_vector(:,2),&
+!        twoel,dens)
+!   RESULT_extend%pair_energy(1,2,2) = energy
+!
+!!   call SCFint_matJ(twoel,OrbSystem(1),OrbSystem(2),OrbSystem(2),OrbSystem(2))
+!   energy = make_contract(&
+!        nbas1,RESULT_extend%orb_vector(:,1),&
+!        nbas2,RESULT_extend%orb_vector(:,2),&
+!        nbas2,RESULT_extend%orb_vector(:,2),&
+!        nbas2,RESULT_extend%orb_vector(:,2),&
+!        twoel,dens)
+!   RESULT_extend%pair_energy(2,2,2) = energy
+!   RESULT_extend%pair_energy(2,1,3) = energy
+!   RESULT_extend%pair_energy(1,2,3) = energy
+!
+!!   call SCFint_matJ(twoel,OrbSystem(2),OrbSystem(2),OrbSystem(2),OrbSystem(2))
+!   energy = make_contract(&
+!        nbas2,RESULT_extend%orb_vector(:,2),&
+!        nbas2,RESULT_extend%orb_vector(:,2),&
+!        nbas2,RESULT_extend%orb_vector(:,2),&
+!        nbas2,RESULT_extend%orb_vector(:,2),&
+!        twoel,dens)
+!   RESULT_extend%pair_energy(2,2,3) = energy
 
    call free_SCFint
    call mem_dealloc(twoel)

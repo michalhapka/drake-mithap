@@ -9,212 +9,214 @@ use CCint3
 implicit none
 
 private
-! public CC_fix_SCForbitals,CC_release_SCForbitals
-! public calculateCC,energyCC
-! 
-! type(SCForbitalsData),pointer :: SCF
-! 
-! integer :: Nexp
-! real(prec),allocatable :: exponents(:)
-! 
-! real(prec) :: RESULT_energy
-! 
-! type CCpairData
-! integer :: nbas
-! real(prec) :: multE,multN
-! real(prec),allocatable :: vecE(:),vecN(:)
-! real(prec),allocatable :: tau(:),Qtau(:),prev(:)
-! real(prec),allocatable :: energy(:,:,:),orthog(:,:,:)
-! integer :: DIIS_size
-! real(prec),allocatable :: DIIS_vec(:,:)
-! end type CCpairData
-! 
-! type OSdata
-! integer :: size
-! integer :: start,end
-! end type OSdata
-! 
-! integer,parameter :: power_LIMIT = -16
-! 
-! contains
-! 
-! subroutine CC_fix_SCForbitals(SCForbitals)
-! implicit none
-! type(SCForbitalsData),target :: SCForbitals
-! 
-! call checkSCF(.false.)
-! 
-! SCF => SCForbitals
-! 
-! end subroutine CC_fix_SCForbitals
-! 
-! subroutine CC_release_SCForbitals
-! implicit none
-! 
-! call checkSCF(.true.)
-! 
-! nullify(SCF)
-! 
-! end subroutine CC_release_SCForbitals
-! 
-! subroutine calculateCC(System,Control)
-! implicit none
-! type(SystemData) :: System
-! type(ControlData) :: Control
-! 
-! call checkSCF(.true.)
-! 
-! Nexp = System%Nexp
-! call mem_alloc(exponents,Nexp)
-! exponents(:) = System%exponents
-! 
-! RESULT_energy = 0._prec
-! 
-! call chooseCC(System,Control,.true.)
-! 
-! call mem_dealloc(exponents)
-! 
-! end subroutine calculateCC
-! 
-! function energyCC(MODexponents,System,Control) result(energy)
-! use misc, only : unpack_vector
-! implicit none
-! real(prec) :: energy
-! real(prec) :: MODexponents(:)
-! type(SystemData) :: System
-! type(ControlData) :: Control
-! 
-! call checkSCF(.true.)
-! 
-! Nexp = System%Nexp
-! call mem_alloc(exponents,Nexp)
-! exponents(:) = System%exponents
-! call unpack_vector(MODexponents,Nexp,exponents,System%isOpt_pairs)
-! 
-! RESULT_energy = 0._prec
-! 
-! call chooseCC(System,Control,.false.)
-! 
-! energy = RESULT_energy
-! 
-! call mem_dealloc(exponents)
-! 
-! end function energyCC
-! 
-! subroutine checkSCF(expected)
-! implicit none
-! logical,intent(in) :: expected
-! 
-! if(associated(SCF).neqv.expected) then
-! 
-!    if(expected) then
-!       write(LOUT,'(a)') 'ERROR!!! &
-!            &SCF data for CC calculations has not been associated!'
-!    else
-!       write(LOUT,'(a)') 'ERROR!!! &
-!            &SCF data for CC calculations has already been associated!'
-!    endif
-! 
-!    stop
-! 
-! endif
-! 
-! end subroutine checkSCF
-! 
-! subroutine chooseCC(System,Control,fullPRINT)
-! implicit none
-! type(SystemData),intent(in) :: System
-! type(ControlData),intent(in) :: Control
-! logical,intent(in) :: fullPRINT
-! 
-! if(System%common_pairs) then
-!    if(System%n_pairs/=1) then
-!       write(LOUT,'(a)') 'ERROR!!! Inconsistent data in chooseCC!'
-!       stop
-!    endif
-! 
-!    call CC_energy_common(System,Control,fullPRINT)
-! 
-! else
-! 
-!    write(LOUT,'(a)') 'NOT YET!!!'
-!    stop
-! 
-! endif
-! 
-! end subroutine chooseCC
-! 
-! subroutine CC_energy_common(System,Control,fullPRINT)
-! use precision, only : dble
-! use time
-! implicit none
-! type(SystemData),intent(in) :: System
-! type(ControlData),intent(in) :: Control
-! logical,intent(in) :: fullPRINT
-! integer :: LPRINT
-! integer :: stage
-! integer :: MAXIT
-! integer :: norb,nbas
-! integer :: ieta,power,iter
-! integer :: ipair,jpair,ijpair,iorb,jorb,korb
-! real(prec) :: eta,factor
-! real(prec) :: energy_this,energy_prev,edelta_this,edelta_prev
-! real(prec),allocatable :: matS_S(:,:),matS_T(:,:)
-! real(prec),allocatable :: matF_S(:,:),matF_T(:,:)
-! real(prec),allocatable :: matP1_S(:,:),matP1_T(:,:)
-! real(prec),allocatable :: matPe_S(:,:),matPe_T(:,:)
-! real(prec),allocatable :: matP2_S(:,:),matP2_T(:,:)
-! real(prec),allocatable :: matL1_S(:,:),matL1_T(:,:)
-! real(prec),allocatable :: matJ_S(:,:,:,:),matJ_T(:,:,:,:)
-! real(prec),allocatable :: matK_S(:,:,:,:),matK_T(:,:,:,:)
-! real(prec),allocatable :: matM_S(:,:,:,:),matM_T(:,:,:,:)
-! real(prec),allocatable :: vec0(:,:,:),vec1(:,:,:),vecP(:,:,:)
-! real(prec),allocatable :: pair_energy(:,:,:,:)
-! real(prec),allocatable :: TMP(:,:)
-! type(CCpairData),allocatable :: CCpairs(:,:)
-! real(prec),allocatable :: energy(:,:,:),orthog(:,:,:)
-! integer,allocatable :: final_iter(:)
-! type(TripletData) :: Triplet
-! real(prec),allocatable :: LHS(:,:),RHS(:)
-! type(DecompositionData) :: project_S,project_T
-! type(DecompositionData),allocatable :: pairLHS(:,:)
-! logical :: do_OS
-! integer :: OS_size
-! type(OSdata),allocatable :: OS(:,:)
-! integer :: DIIS_start,DIIS_size
-! logical :: DIIS
-! integer :: DIIS_off,DIIS_n
-! real(dble) :: Tcpu,Twall
-! 
-! LPRINT = merge(Control%LPRINT,0,fullPRINT)
-! 
-! select case(trim(System%calc_type))
-! case('FCCD','FCCD-L')
-!    stage = 3
-! case('LCCD','LCCD-L')
-!    stage = 2
-! case('CID','CID-L')
-!    stage = 1
-! case default
-!    stage = 0
-! end select
-! 
-! do_OS = (index(System%calc_type,'-L')/=0)
-! 
-! MAXIT = merge(Control%ENERGMAXIT,1,stage>0)
-! 
-! if(do_OS) then
-!    DIIS_start = 3
-!    DIIS_size  = 6
-! else
-!    DIIS_start = -1
-!    DIIS_size  = -1
-! endif
-! DIIS = (stage>0).and.(DIIS_start>1).and.(DIIS_size>1)
-! if(.not.DIIS) DIIS_size = -1
-! 
-! norb = System%norb
-! 
+ public CC_fix_SCForbitals,CC_release_SCForbitals
+ public calculateCC,energyCC
+ 
+ type(SCForbitalsData),pointer :: SCF
+ 
+ integer :: Nexp
+ real(prec),allocatable :: exponents(:)
+ 
+ real(prec) :: RESULT_energy
+ 
+ type CCpairData
+ integer :: nbas
+ real(prec) :: multE,multN
+ real(prec),allocatable :: vecE(:),vecN(:)
+ real(prec),allocatable :: tau(:),Qtau(:),prev(:)
+ real(prec),allocatable :: energy(:,:,:),orthog(:,:,:)
+ integer :: DIIS_size
+ real(prec),allocatable :: DIIS_vec(:,:)
+ end type CCpairData
+ 
+ type OSdata
+ integer :: size
+ integer :: start,end
+ end type OSdata
+ 
+ integer,parameter :: power_LIMIT = -16
+ 
+ contains
+ 
+ subroutine CC_fix_SCForbitals(SCForbitals)
+ implicit none
+ type(SCForbitalsData),target :: SCForbitals
+ 
+ call checkSCF(.false.)
+ 
+ SCF => SCForbitals
+ 
+ end subroutine CC_fix_SCForbitals
+ 
+ subroutine CC_release_SCForbitals
+ implicit none
+ 
+ call checkSCF(.true.)
+ 
+ nullify(SCF)
+ 
+ end subroutine CC_release_SCForbitals
+ 
+ subroutine calculateCC(System,Control)
+ implicit none
+ type(SystemData) :: System
+ type(ControlData) :: Control
+ 
+ call checkSCF(.true.)
+ 
+ Nexp = System%Nexp
+ call mem_alloc(exponents,Nexp)
+ exponents(:) = System%exponents
+ 
+ RESULT_energy = 0._prec
+ 
+ call chooseCC(System,Control,.true.)
+ 
+ call mem_dealloc(exponents)
+ 
+ end subroutine calculateCC
+ 
+ function energyCC(MODexponents,System,Control) result(energy)
+ use misc, only : unpack_vector
+ implicit none
+ real(prec) :: energy
+ real(prec) :: MODexponents(:)
+ type(SystemData) :: System
+ type(ControlData) :: Control
+ 
+ call checkSCF(.true.)
+ 
+ Nexp = System%Nexp
+ call mem_alloc(exponents,Nexp)
+ exponents(:) = System%exponents
+ call unpack_vector(MODexponents,Nexp,exponents,System%isOpt_pairs)
+ 
+ RESULT_energy = 0._prec
+ 
+ call chooseCC(System,Control,.false.)
+ 
+ energy = RESULT_energy
+ 
+ call mem_dealloc(exponents)
+ 
+ end function energyCC
+ 
+ subroutine checkSCF(expected)
+ implicit none
+ logical,intent(in) :: expected
+ 
+ if(associated(SCF).neqv.expected) then
+ 
+    if(expected) then
+       write(LOUT,'(a)') 'ERROR!!! &
+            &SCF data for CC calculations has not been associated!'
+    else
+       write(LOUT,'(a)') 'ERROR!!! &
+            &SCF data for CC calculations has already been associated!'
+    endif
+ 
+    stop
+ 
+ endif
+ 
+ end subroutine checkSCF
+ 
+ subroutine chooseCC(System,Control,fullPRINT)
+ implicit none
+ type(SystemData),intent(in) :: System
+ type(ControlData),intent(in) :: Control
+ logical,intent(in) :: fullPRINT
+ 
+ if(System%common_pairs) then
+    if(System%n_pairs/=1) then
+       write(LOUT,'(a)') 'ERROR!!! Inconsistent data in chooseCC!'
+       stop
+    endif
+ 
+    call CC_energy_common(System,Control,fullPRINT)
+ 
+ else
+ 
+    write(LOUT,'(a)') 'NOT YET!!!'
+    stop
+ 
+ endif
+ 
+ end subroutine chooseCC
+ 
+ subroutine CC_energy_common(System,Control,fullPRINT)
+ use precision, only : dble
+ use time
+ implicit none
+ type(SystemData),intent(in) :: System
+ type(ControlData),intent(in) :: Control
+ logical,intent(in) :: fullPRINT
+ integer :: LPRINT
+ integer :: stage
+ integer :: MAXIT
+ !integer :: norb,nbas
+ integer,allocatable :: norb(:),nbas(:)
+ integer :: ieta,power,iter
+ integer :: ipair,jpair,ijpair,iorb,jorb,korb
+ real(prec) :: eta,factor
+ real(prec) :: energy_this,energy_prev,edelta_this,edelta_prev
+ real(prec),allocatable :: matS_S(:,:),matS_T(:,:)
+ real(prec),allocatable :: matF_S(:,:),matF_T(:,:)
+ real(prec),allocatable :: matP1_S(:,:),matP1_T(:,:)
+ real(prec),allocatable :: matPe_S(:,:),matPe_T(:,:)
+ real(prec),allocatable :: matP2_S(:,:),matP2_T(:,:)
+ real(prec),allocatable :: matL1_S(:,:),matL1_T(:,:)
+ real(prec),allocatable :: matJ_S(:,:,:,:),matJ_T(:,:,:,:)
+ real(prec),allocatable :: matK_S(:,:,:,:),matK_T(:,:,:,:)
+ real(prec),allocatable :: matM_S(:,:,:,:),matM_T(:,:,:,:)
+ real(prec),allocatable :: vec0(:,:,:),vec1(:,:,:),vecP(:,:,:)
+ real(prec),allocatable :: pair_energy(:,:,:,:)
+ real(prec),allocatable :: TMP(:,:)
+ type(CCpairData),allocatable :: CCpairs(:,:)
+ real(prec),allocatable :: energy(:,:,:),orthog(:,:,:)
+ integer,allocatable :: final_iter(:)
+ type(TripletData) :: Triplet
+ real(prec),allocatable :: LHS(:,:),RHS(:)
+ type(DecompositionData) :: project_S,project_T
+ type(DecompositionData),allocatable :: pairLHS(:,:)
+ logical :: do_OS
+ integer :: OS_size
+ type(OSdata),allocatable :: OS(:,:)
+ integer :: DIIS_start,DIIS_size
+ logical :: DIIS
+ integer :: DIIS_off,DIIS_n
+ real(dble) :: Tcpu,Twall
+ 
+ LPRINT = merge(Control%LPRINT,0,fullPRINT)
+ 
+ select case(trim(System%calc_type))
+ case('FCCD','FCCD-L')
+    stage = 3
+ case('LCCD','LCCD-L')
+    stage = 2
+ case('CID','CID-L')
+    stage = 1
+ case default
+    stage = 0
+ end select
+ 
+ do_OS = (index(System%calc_type,'-L')/=0)
+ 
+ MAXIT = merge(Control%ENERGMAXIT,1,stage>0)
+ 
+ if(do_OS) then
+    DIIS_start = 3
+    DIIS_size  = 6
+ else
+    DIIS_start = -1
+    DIIS_size  = -1
+ endif
+ DIIS = (stage>0).and.(DIIS_start>1).and.(DIIS_size>1)
+ if(.not.DIIS) DIIS_size = -1
+ 
+ call mem_alloc(norb,System%maxl+1)
+ norb = System%norb
+ 
 ! associate(PairSystem => System%PairSystem(1,1))
 ! 
 !   nbas = PairSystem%nbas
@@ -242,16 +244,16 @@ private
 ! 
 !   call mem_alloc(TMP,nbas,nbas)
 ! 
-!   if(fullPRINT) then
-!      write(LOUT,'()')
-!      call timer('START',Tcpu,Twall)
-!   endif
-! 
-!   call create_CCint2(Nexp,exponents,System%OrbPairReduced,LPRINT)
-!   if(fullPRINT) then
-!      call timer('2-el integrals init',Tcpu,Twall)
-!      flush(LOUT)
-!   endif
+   if(fullPRINT) then
+      write(LOUT,'()')
+      call timer('START',Tcpu,Twall)
+   endif
+ 
+   call create_CCint2(Nexp,exponents,System%OrbPairReduced,LPRINT)
+   if(fullPRINT) then
+      call timer('2-el integrals init',Tcpu,Twall)
+      flush(LOUT)
+   endif
 ! 
 !   call CCint2_matS('A',0,TMP,PairSystem,PairSystem)
 !   matS_S(:,:) = TMP
@@ -293,8 +295,8 @@ private
 !         end associate
 !      enddo
 !   enddo
-! 
-!   call free_CCint2
+ 
+   call free_CCint2
 !   if(fullPRINT) then
 !      call timer('2-el integrals use',Tcpu,Twall)
 !      flush(LOUT)
@@ -1271,7 +1273,8 @@ private
 !   call mem_dealloc(matP1_S); call mem_dealloc(matP1_T)
 !   call mem_dealloc(matF_S);  call mem_dealloc(matF_T)
 !   call mem_dealloc(matS_S);  call mem_dealloc(matS_T)
-! 
+    call mem_dealloc(norb)
+!    
 ! end associate
 ! 
 ! contains
@@ -1540,7 +1543,7 @@ private
 !   if(idx==0) idx = DIIS_size + 1
 !   end function idx
 ! 
-! end subroutine CC_energy_common
+ end subroutine CC_energy_common
 ! 
 ! subroutine header_iter
 ! implicit none

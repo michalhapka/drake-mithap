@@ -21,6 +21,7 @@ public check_PairSystem,check_consistency_PairReduced
 public increment_PairSpec
 public maxOmega_PairSpec,maxt_PairSpec,maxuv_PairSpec
 public maxOmega_PairReduced,maxt_PairReduced,maxuv_PairReduced
+public check_gen_pairs
 public TripletData,init_Triplet,free_Triplet,shrink_Triplet,expand_Triplet
 public SCForbitalsData,init_SCForbitals,free_SCForbitals,print_SCForbitals
 
@@ -54,10 +55,10 @@ integer,parameter :: get_num_gen(0:1) = [1,5]
 integer,parameter :: total_gen = 5
 
 character(*),parameter :: possible_generators(total_gen) = &
-     [character(8) :: 'S^E', 'P^E', 'P^O', 'D^E(1)', 'D^E(2)']
+     [character(8) :: 'S^E', 'P^O', 'P^E', 'D^E(1)', 'D^E(2)']
 
 logical,parameter :: swapable_generators(total_gen) = &
-     [.true., .true., .false., .true., .false.]
+     [.true., .false., .true., .true., .false.]
 
 character(*),parameter :: possible_mult(-1:3) = &
      [character(8) :: 'UNDEF', 'ALL', 'SINGLET', 'BOTH', 'TRIPLET']
@@ -249,13 +250,29 @@ integer :: nbas,nbas_orig
 integer,allocatable :: idxS(:),idxE(:)
 end type TripletData
 
-type SCForbitalsData
+type SCForbitalsData_l
+integer :: lorb
 integer :: norb,nbas
-real(prec) :: energy
 real(prec) :: HOMO,LUMO
 real(prec),allocatable :: orb_energy(:)
 real(prec),allocatable :: orb_vector(:,:)
-real(prec),allocatable :: pair_energy(:,:,:)
+end type SCForbitalsData_l
+
+type SCForbitalsData_gen
+integer :: gen_type
+real(prec),allocatable :: pair_energy(:,:,:,:)
+end type SCForbitalsData_gen
+
+type SCForbitalsData
+integer :: NumOrbGen 
+real(prec) :: energy
+type(SCForbitalsData_l),allocatable :: SCForb_l(:)
+type(SCForbitalsData_gen),allocatable :: SCForb_gen(:)
+!integer :: norb,nbas
+!real(prec) :: HOMO,LUMO
+!real(prec),allocatable :: orb_energy(:)
+!real(prec),allocatable :: orb_vector(:,:)
+!real(prec),allocatable :: pair_energy(:,:,:)
 end type SCForbitalsData
 
 contains
@@ -1662,56 +1679,118 @@ Omega = 0
 
 end function maxOmega_PairReduced
 
+subroutine check_gen_pairs(iPairReducedG,jPairReduced,jGenMax,jGenNum)
+implicit none
+type(PairReducedData_G),intent(in) :: iPairReducedG
+type(PairReducedData),intent(in) :: jPairReduced
+integer :: jGenNum(:)
+integer :: jGenMax
+integer :: i
+
+jGenMax = 0
+jGenNum = 0 
+
+select case(iPairReducedG%gen_type)
+case(1,6)
+   !write(*,*) jPairReduced%n_gen,'j%ngen'
+   do i=1,jPairReduced%n_gen
+      associate(jPairReducedG => jPairReduced%PairReduced_G(i))
+        if((jPairReducedG%gen_type==1).or.(jPairReducedG%gen_type==6)) then
+           jGenMax = jGenMax + 1
+           jGenNum(jGenMax) = i
+        endif
+      end associate
+   enddo
+
+case(2)
+
+   do i=1,jPairReduced%n_gen
+      associate(jPairReducedG => jPairReduced%PairReduced_G(i))
+        if(jPairReducedG%gen_type==2) then
+           jGenMax = jGenMax + 1
+           jGenNum(jGenMax) = i
+        endif
+      end associate
+   enddo
+
+case(3)
+
+   do i=1,jPairReduced%n_gen
+      associate(jPairReducedG => jPairReduced%PairReduced_G(i))
+        if(jPairReducedG%gen_type==3) then
+           jGenMax = jGenMax + 1
+           jGenNum(jGenMax) = i
+        endif
+      end associate
+   enddo
+
+case(4,5)
+
+   do i=1,jPairReduced%n_gen
+      associate(jPairReducedG => jPairReduced%PairReduced_G(i))
+        if((jPairReducedG%gen_type==4).or.(jPairReducedG%gen_type==5)) then
+           jGenMax = jGenMax + 1
+           jGenNum(jGenMax) = i
+        endif
+      end associate
+   enddo
+
+end select
+
+!write(LOUT,*) jGenMax,'   ',jGenNum
+
+end subroutine check_gen_pairs
+
 function maxt_PairReduced(PairReduced,smallest) result(maxt)
 implicit none
 integer :: maxt
-type(PairReducedData),intent(in) :: PairReduced
+type(PairReducedData_G),intent(in) :: PairReduced
 integer,intent(in),optional :: smallest
 
-!if(present(smallest)) then
-!   maxt = smallest - 1
-!else
-!   maxt = 0
-!endif
-!
-!if(PairReduced%istype1) &
-!     maxt = max(maxt,PairReduced%maxrange1)
-!
-!if(PairReduced%istype2) &
-!     maxt = max(maxt,PairReduced%maxrange2(2,PairReduced%n_range2))
-!
-!if(PairReduced%istype3) &
-!     maxt = max(maxt,PairReduced%maxrange3(3,PairReduced%n_range3))
+if(present(smallest)) then
+   maxt = smallest - 1
+else
+   maxt = 0
+endif
+
+if(PairReduced%istype1) &
+     maxt = max(maxt,PairReduced%maxrange1)
+
+if(PairReduced%istype2) &
+     maxt = max(maxt,PairReduced%maxrange2(2,PairReduced%n_range2))
+
+if(PairReduced%istype3) &
+     maxt = max(maxt,PairReduced%maxrange3(3,PairReduced%n_range3))
 
 end function maxt_PairReduced
 
 function maxuv_PairReduced_not(PairReduced,smallest) result(maxuv)
 implicit none
 integer :: maxuv
-type(PairReducedData),intent(in) :: PairReduced
+type(PairReducedData_G),intent(in) :: PairReduced
 integer,intent(in),optional :: smallest
 integer :: i
 
-!if(present(smallest)) then
-!   maxuv = smallest - 1
-!else
-!   maxuv = 0
-!endif
-!
-!if(PairReduced%istype1) &
-!     maxuv = max(maxuv,PairReduced%maxrange1)
-!
-!if(PairReduced%istype2) then
-!   do i=1,PairReduced%n_range2
-!      maxuv = max(maxuv,PairReduced%maxrange2(1,i))
-!   enddo
-!endif
-!
-!if(PairReduced%istype3) then
-!   do i=1,PairReduced%n_range3
-!      maxuv = max(maxuv,PairReduced%maxrange3(1,i),PairReduced%maxrange3(2,i))
-!   enddo
-!endif
+if(present(smallest)) then
+   maxuv = smallest - 1
+else
+   maxuv = 0
+endif
+
+if(PairReduced%istype1) &
+     maxuv = max(maxuv,PairReduced%maxrange1)
+
+if(PairReduced%istype2) then
+   do i=1,PairReduced%n_range2
+      maxuv = max(maxuv,PairReduced%maxrange2(1,i))
+   enddo
+endif
+
+if(PairReduced%istype3) then
+   do i=1,PairReduced%n_range3
+      maxuv = max(maxuv,PairReduced%maxrange3(1,i),PairReduced%maxrange3(2,i))
+   enddo
+endif
 
 end function maxuv_PairReduced_not
 
@@ -1719,40 +1798,40 @@ function maxuv_PairReduced_t(t,PairReduced,smallest) result(maxuv)
 implicit none
 integer :: maxuv(2)
 integer,intent(in) :: t
-type(PairReducedData),intent(in) :: PairReduced
+type(PairReducedData_G),intent(in) :: PairReduced
 integer,intent(in) :: smallest
 integer :: i
 
-!maxuv = smallest - 1
-!
-!if(PairReduced%istype1) then
-!   maxuv(1) = max(maxuv(1),PairReduced%maxrange1-t)
-!   maxuv(2) = max(maxuv(2),PairReduced%maxrange1-t)
-!endif
-!
-!if(PairReduced%istype2) then
-!   do i=1,PairReduced%n_range2
-!      if(PairReduced%maxrange2(2,i)==t) then
-!         maxuv(1) = max(maxuv(1),PairReduced%maxrange2(1,i))
-!         maxuv(2) = max(maxuv(2),PairReduced%maxrange2(1,i))
-!      end if
-!   enddo
-!endif
-!
-!if(PairReduced%istype3) then
-!   do i=1,PairReduced%n_range3
-!      if(PairReduced%maxrange3(3,i)==t) then
-!         maxuv(1) = max(maxuv(1),PairReduced%maxrange3(1,i))
-!         maxuv(2) = max(maxuv(2),PairReduced%maxrange3(2,i))
-!      end if
-!   enddo
-!endif
-!
-!if((maxuv(1)<smallest).neqv.(maxuv(2)<smallest)) then
-!   write(LOUT,'(a)') 'ERROR!!! &
-!        &Ranges of u and v cannot be determined in maxuv_PairReduced!'
-!   stop
-!endif
+maxuv = smallest - 1
+
+if(PairReduced%istype1) then
+   maxuv(1) = max(maxuv(1),PairReduced%maxrange1-t)
+   maxuv(2) = max(maxuv(2),PairReduced%maxrange1-t)
+endif
+
+if(PairReduced%istype2) then
+   do i=1,PairReduced%n_range2
+      if(PairReduced%maxrange2(2,i)==t) then
+         maxuv(1) = max(maxuv(1),PairReduced%maxrange2(1,i))
+         maxuv(2) = max(maxuv(2),PairReduced%maxrange2(1,i))
+      end if
+   enddo
+endif
+
+if(PairReduced%istype3) then
+   do i=1,PairReduced%n_range3
+      if(PairReduced%maxrange3(3,i)==t) then
+         maxuv(1) = max(maxuv(1),PairReduced%maxrange3(1,i))
+         maxuv(2) = max(maxuv(2),PairReduced%maxrange3(2,i))
+      end if
+   enddo
+endif
+
+if((maxuv(1)<smallest).neqv.(maxuv(2)<smallest)) then
+   write(LOUT,'(a)') 'ERROR!!! &
+        &Ranges of u and v cannot be determined in maxuv_PairReduced!'
+   stop
+endif
 
 end function maxuv_PairReduced_t
 
@@ -2482,8 +2561,36 @@ subroutine init_SCForbitals(SCForbitals,System)
 implicit none
 type(SCForbitalsData) :: SCForbitals
 type(SystemData) :: System
-integer :: i
+integer :: i,j
 
+ SCForbitals%NumOrbGen = 5
+ SCForbitals%energy = 0._prec
+ allocate(SCForbitals%SCForb_l(System%maxl+1))
+ allocate(SCForbitals%SCForb_gen(SCForbitals%NumOrbGen))
+
+ do j=0,System%maxl
+    associate(SCForbitals => SCForbitals%SCForb_l(j+1),&
+              n_orbs => System%n_orbs(j+1))
+    SCForbitals%lorb = j
+    SCForbitals%norb = System%norb(j+1)
+    SCForbitals%nbas = 0
+    do i=1,n_orbs
+       associate(OrbSystem => System%OrbSystem_L(j+1)%OrbSystem(i))
+         SCForbitals%nbas = max(SCForbitals%nbas,OrbSystem%nbas)
+       end associate
+    enddo
+
+    call mem_alloc(SCForbitals%orb_energy,SCForbitals%norb)
+    call mem_alloc(SCForbitals%orb_vector,SCForbitals%nbas,SCForbitals%norb)
+    SCForbitals%orb_energy  = 0._prec
+    SCForbitals%orb_vector  = 0._prec
+
+    end associate
+ enddo
+
+! hapka: ADD pair_energy!!!!
+
+! hapka: old_drake
 ! SCForbitals%norb = System%norb
 ! SCForbitals%nbas = 0
 ! do i=1,System%n_orbs
@@ -2506,17 +2613,28 @@ integer :: i
 
 end subroutine init_SCForbitals
 
-subroutine free_SCForbitals(SCForbitals)
+subroutine free_SCForbitals(SCForbitals,maxl)
 implicit none
 type(SCForbitalsData) :: SCForbitals
+integer,intent(in) :: maxl
+integer :: i
 
-call mem_dealloc(SCForbitals%pair_energy)
-call mem_dealloc(SCForbitals%orb_vector)
-call mem_dealloc(SCForbitals%orb_energy)
+!do i=1,SCForbitals%NumOrbGen
+!    call mem_dealloc(SCForbitals%SCForb_gen(i)%pair_energy)
+!enddo
+
+do i=0,maxl
+    call mem_dealloc(SCForbitals%SCForb_l(i+1)%orb_vector)
+    call mem_dealloc(SCForbitals%SCForb_l(i+1)%orb_energy)
+enddo
+
+deallocate(SCForbitals%SCForb_l)
+deallocate(SCForbitals%SCForb_gen)
 
 end subroutine free_SCForbitals
 
 subroutine print_SCForbitals(SCForbitals,System)
+use angmom
 implicit none
 type(SCForbitalsData) :: SCForbitals
 type(SystemData) :: System
@@ -2526,56 +2644,65 @@ integer :: i,j
 real(prec) :: energy
 integer,allocatable :: nbas(:)
 
-! write(LOUT,'()')
-! write(LOUT,'(5x,a)') '--- SCF orbitals and energies ---'
-! 
-! write(LOUT,'()')
-! write(LOUT,'(a,i5)') 'Number of orbitals: ',SCForbitals%norb
-! if(System%common_orbs) then
-!    write(LOUT,'(a,i5)') 'Basis set size:     ',SCForbitals%nbas
-! else
-!    write(LOUT,'(a,i5)') 'Max basis set size: ',SCForbitals%nbas
-! endif
-! 
-! write(LOUT,'()')
-! write(LOUT,'(13x,a,i2,9(:15x,a,i2))') ('orb no. ',iorb,iorb=1,SCForbitals%norb)
-! 
-! write(LOUT,'()')
-! write(LOUT,'(a)') 'AO coefficients'
-! if(System%common_orbs) then
-!    do ibas=1,SCForbitals%nbas
-!       write(LOUT,'(i5,10es25.14)') ibas,&
-!            (SCForbitals%orb_vector(ibas,iorb),iorb=1,SCForbitals%norb)
-!    enddo
-! else
-!    call mem_alloc(nbas,SCForbitals%norb)
-!    do iorb=1,SCForbitals%norb
-!       nbas(iorb) = System%OrbSystem(iorb)%nbas
-!    enddo
-!    do ibas=1,SCForbitals%nbas
-!       write(LOUT,'(i5)',advance='no') ibas
-!       do iorb=1,SCForbitals%norb
-!          if(ibas<=nbas(iorb)) then
-!             write(LOUT,'(es25.14)',advance='no') &
-!                  SCForbitals%orb_vector(ibas,iorb)
-!          else
-!             write(LOUT,'(a25)',advance='no') ''
-!          endif
-!       enddo
-!       write(LOUT,'()')
-!    enddo
-!    call mem_dealloc(nbas)
-! endif
-! 
-! write(LOUT,'()')
-! write(LOUT,'(a)') 'orbital energies'
-! write(LOUT,'(5x,10f25.18)') &
-!      (SCForbitals%orb_energy(iorb),iorb=1,SCForbitals%norb)
-! 
-! write(LOUT,'()') 
-! write(LOUT,'(a,f25.18)') 'LUMO: ',SCForbitals%LUMO
-! write(LOUT,'(a,f25.18)') 'HOMO: ',SCForbitals%HOMO
-! 
+ write(LOUT,'()')
+ write(LOUT,'(5x,a)') '--- SCF orbitals and energies ---'
+ 
+ write(LOUT,'()')
+ do i=0,System%maxl
+    associate( SCForbitals => SCForbitals%SCForb_l(i+1))
+      write(LOUT,'(a)') '-- '//get_angmom_name(i)//' orbitals --'
+      write(LOUT,'(a,i5)') 'Number of orbitals: ',SCForbitals%norb
+      if(System%common_orbs) then
+         write(LOUT,'(a,i5)') 'Basis set size:     ',SCForbitals%nbas
+      else
+         write(LOUT,'(a,i5)') 'Max basis set size: ',SCForbitals%nbas
+      endif
+   
+      write(LOUT,'()')
+      write(LOUT,'(13x,a,i2,9(:15x,a,i2))') ('orb no. ',iorb,iorb=1,SCForbitals%norb)
+ 
+      write(LOUT,'()')
+      write(LOUT,'(a)') 'AO coefficients'
+      if(System%common_orbs) then
+         do ibas=1,SCForbitals%nbas
+            write(LOUT,'(i5,10es25.14)') ibas,&
+                 (SCForbitals%orb_vector(ibas,iorb),iorb=1,SCForbitals%norb)
+         enddo
+      else
+         call mem_alloc(nbas,SCForbitals%norb)
+         do iorb=1,SCForbitals%norb
+            nbas(iorb) = System%OrbSystem_L(i)%OrbSystem(iorb)%nbas
+         enddo
+         do ibas=1,SCForbitals%nbas
+            write(LOUT,'(i5)',advance='no') ibas
+            do iorb=1,SCForbitals%norb
+               if(ibas<=nbas(iorb)) then
+                  write(LOUT,'(es25.14)',advance='no') &
+                       SCForbitals%orb_vector(ibas,iorb)
+               else
+                  write(LOUT,'(a25)',advance='no') ''
+               endif
+            enddo
+            write(LOUT,'()')
+         enddo
+         call mem_dealloc(nbas)
+      endif
+ 
+      write(LOUT,'()')
+      write(LOUT,'(a)') 'orbital energies'
+      write(LOUT,'(5x,10f25.18)') &
+           (SCForbitals%orb_energy(iorb),iorb=1,SCForbitals%norb)
+      
+      write(LOUT,'()') 
+      write(LOUT,'(a,f25.18)') 'LUMO: ',SCForbitals%LUMO
+      write(LOUT,'(a,f25.18)') 'HOMO: ',SCForbitals%HOMO
+
+! hapka: add pair energies!
+      write(LOUT,'()') 
+    end associate
+ enddo
+
+! hapka: add pair energies!
 ! write(LOUT,'()')
 ! write(LOUT,'(a)') 'pair energies'
 ! ij2 = 0
@@ -2606,10 +2733,10 @@ integer,allocatable :: nbas(:)
 !    enddo
 ! enddo
 ! 
-! write(LOUT,'(a)') 'SCF energy'
+ write(LOUT,'(a)') 'SCF energy'
 ! write(LOUT,'(a,f25.18)') 'from orbital and pair energies: ',energy
-! write(LOUT,'(a,f25.18)') 'from the SCF procedure:         ',SCForbitals%energy
-! 
+ write(LOUT,'(a,f25.18)') 'from the SCF procedure:         ',SCForbitals%energy
+ 
 end subroutine print_SCForbitals
 
 end module commontypes

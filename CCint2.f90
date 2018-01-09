@@ -20,14 +20,21 @@ type r12Data
 real(prec),allocatable :: elms(:,:)
 end type r12Data
 
+type ILambdaData
+integer :: range_t
+integer,allocatable :: range_uv(:,:)
+type(r12Data),allocatable :: r12(:)
+end type ILambdaData
+
 type TwoIntData
 logical :: isUsed
 integer :: iexp,jexp,kexp,lexp
 logical :: same_exp
 real(prec) :: ijalphaPL,ijalphaMI,klalphaPL,klalphaMI
-integer :: range_t
-integer,allocatable :: range_uv(:,:)
-type(r12Data),allocatable :: r12(:)
+type(ILambdaData) :: ILambda(0:2)
+!integer :: range_t
+!integer,allocatable :: range_uv(:,:)
+!type(r12Data),allocatable :: r12(:)
 end type TwoIntData
 
 type(TwoIntData),allocatable :: TwoInt(:)
@@ -45,9 +52,9 @@ call init1_TwoInt(Nexp,exponents)
 call init2_TwoInt(PairReduced)
 call init3_TwoInt(PairReduced)
 
-call create_TwoInt
+!call create_TwoInt
 
-call print_TwoInt(LPRINT)
+!call print_TwoInt(LPRINT)
 
 end subroutine create_CCint2
 
@@ -259,33 +266,33 @@ contains
 
   pos_t = offset_t  + cPL
 
-  associate(elms => Two%r12(pos_t)%elms)
-    if(ijklorder) then
-
-       pos_u = offset_uv + aPL
-       pos_v = offset_uv + bPL
-
-       val = (A0 + B0)*elms(pos_u,pos_v) &
-            + A1*elms(pos_u-1,pos_v) &
-            + B1*elms(pos_u,pos_v-1)
-       if(isA2) val = val + A2*elms(pos_u-2,pos_v)
-       if(isB2) val = val + B2*elms(pos_u,pos_v-2)
-
-    else
-
-       pos_u = offset_uv + bPL
-       pos_v = offset_uv + aPL
-
-       val = (B0 + A0)*elms(pos_u,pos_v) &
-            + B1*elms(pos_u-1,pos_v) &
-            + A1*elms(pos_u,pos_v-1)
-       if(isB2) val = val + B2*elms(pos_u-2,pos_v)
-       if(isA2) val = val + A2*elms(pos_u,pos_v-2)
-
-    endif
-  end associate
-
-  if(isC2) val = val + C2*Two%r12(pos_t-2)%elms(pos_u,pos_v)
+!  associate(elms => Two%r12(pos_t)%elms)
+!    if(ijklorder) then
+!
+!       pos_u = offset_uv + aPL
+!       pos_v = offset_uv + bPL
+!
+!       val = (A0 + B0)*elms(pos_u,pos_v) &
+!            + A1*elms(pos_u-1,pos_v) &
+!            + B1*elms(pos_u,pos_v-1)
+!       if(isA2) val = val + A2*elms(pos_u-2,pos_v)
+!       if(isB2) val = val + B2*elms(pos_u,pos_v-2)
+!
+!    else
+!
+!       pos_u = offset_uv + bPL
+!       pos_v = offset_uv + aPL
+!
+!       val = (B0 + A0)*elms(pos_u,pos_v) &
+!            + B1*elms(pos_u-1,pos_v) &
+!            + A1*elms(pos_u,pos_v-1)
+!       if(isB2) val = val + B2*elms(pos_u-2,pos_v)
+!       if(isA2) val = val + A2*elms(pos_u,pos_v-2)
+!
+!    endif
+!  end associate
+!
+!  if(isC2) val = val + C2*Two%r12(pos_t-2)%elms(pos_u,pos_v)
 
   val = val/4._prec
 
@@ -351,10 +358,10 @@ do j_prim=1,jPairSystem%n_prim
                    do while(increment_PairSpec(ui,vi,ti,iflag,iPairSpec))
                       ipos = ipos + 1
 
-                      matS(ipos,jpos) = Two%r12(&
-                           offset_t  + ti + tj + add_t)%elms( &
-                           offset_uv + ui + uj, &
-                           offset_uv + vi + vj)
+                   !   matS(ipos,jpos) = Two%r12(&
+                   !        offset_t  + ti + tj + add_t)%elms( &
+                   !        offset_uv + ui + uj, &
+                   !        offset_uv + vi + vj)
 
                    enddo
 
@@ -372,10 +379,10 @@ do j_prim=1,jPairSystem%n_prim
                    do while(increment_PairSpec(ui,vi,ti,iflag,iPairSpec))
                       ipos = ipos + 1
 
-                      matS(ipos,jpos) = Two%r12(&
-                           offset_t  + ti + tj + add_t)%elms( &
-                           offset_uv + vi + vj, &
-                           offset_uv + ui + uj)
+                   !   matS(ipos,jpos) = Two%r12(&
+                   !        offset_t  + ti + tj + add_t)%elms( &
+                   !        offset_uv + vi + vj, &
+                   !        offset_uv + ui + uj)
 
                    enddo
 
@@ -418,10 +425,10 @@ do j_prim=1,jPairSystem%n_prim
                    do while(increment_PairSpec(ui,vi,ti,iflag,iPairSpec))
                       ipos = ipos + 1
 
-                      matS(ipos,jpos) = Two%r12(&
-                           offset_t  + ti + tj + add_t)%elms( &
-                           offset_uv + ui + vj, &
-                           offset_uv + vi + uj)
+                    !  matS(ipos,jpos) = Two%r12(&
+                    !       offset_t  + ti + tj + add_t)%elms( &
+                    !       offset_uv + ui + vj, &
+                    !       offset_uv + vi + uj)
 
                    enddo
 
@@ -439,10 +446,10 @@ do j_prim=1,jPairSystem%n_prim
                    do while(increment_PairSpec(ui,vi,ti,iflag,iPairSpec))
                       ipos = ipos + 1
 
-                      matS(ipos,jpos) = Two%r12(&
-                           offset_t  + ti + tj + add_t)%elms( &
-                           offset_uv + vi + uj, &
-                           offset_uv + ui + vj)
+                    !  matS(ipos,jpos) = Two%r12(&
+                    !       offset_t  + ti + tj + add_t)%elms( &
+                    !       offset_uv + vi + uj, &
+                    !       offset_uv + ui + vj)
 
                    enddo
 
@@ -523,27 +530,27 @@ do j_prim=1,j_OrbSystem%n_prim
                 do while(increment_PairSpec(u,v,t,flag,PairSpec))
                    pos  = pos + 1
                    rtmp = 0._prec
-                   associate(elms => Two%r12(offset_t + t + add_t)%elms)
+            !       associate(elms => Two%r12(offset_t + t + add_t)%elms)
 
-                     j_pos = j_OrbSpec%offset
-                     do j=0,j_OrbSpec%irange
-                        j_pos = j_pos + 1
+            !         j_pos = j_OrbSpec%offset
+            !         do j=0,j_OrbSpec%irange
+            !            j_pos = j_pos + 1
 
-                        pos_v = offset_uv + j + v
+            !            pos_v = offset_uv + j + v
 
-                        i_pos = i_OrbSpec%offset
-                        do i=0,i_OrbSpec%irange
-                           i_pos = i_pos + 1
+            !            i_pos = i_OrbSpec%offset
+            !            do i=0,i_OrbSpec%irange
+            !               i_pos = i_pos + 1
 
-                           rtmp = rtmp &
-                                + i_vector(i_pos)*j_vector(j_pos) &
-                                * elms(offset_uv + i + u,pos_v)
+            !               rtmp = rtmp &
+            !                    + i_vector(i_pos)*j_vector(j_pos) &
+            !                    * elms(offset_uv + i + u,pos_v)
 
-                        enddo
+            !            enddo
 
-                     enddo
+            !         enddo
 
-                   end associate
+            !       end associate
                    vec(pos) = vec(pos) + rtmp
                 enddo
 
@@ -554,27 +561,27 @@ do j_prim=1,j_OrbSystem%n_prim
                 do while(increment_PairSpec(u,v,t,flag,PairSpec))
                    pos  = pos + 1
                    rtmp = 0._prec
-                   associate(elms => Two%r12(offset_t + t + add_t)%elms)
+              !     associate(elms => Two%r12(offset_t + t + add_t)%elms)
 
-                     i_pos = i_OrbSpec%offset
-                     do i=0,i_OrbSpec%irange
-                        i_pos = i_pos + 1
+              !       i_pos = i_OrbSpec%offset
+              !       do i=0,i_OrbSpec%irange
+              !          i_pos = i_pos + 1
 
-                        pos_v = offset_uv + i + u
+              !          pos_v = offset_uv + i + u
 
-                        j_pos = j_OrbSpec%offset
-                        do j=0,j_OrbSpec%irange
-                           j_pos = j_pos + 1
+              !          j_pos = j_OrbSpec%offset
+              !          do j=0,j_OrbSpec%irange
+              !             j_pos = j_pos + 1
 
-                           rtmp = rtmp &
-                                + j_vector(j_pos)*i_vector(i_pos) &
-                                * elms(offset_uv + j + v,pos_v)
+              !             rtmp = rtmp &
+              !                  + j_vector(j_pos)*i_vector(i_pos) &
+              !                  * elms(offset_uv + j + v,pos_v)
 
-                        enddo
+              !          enddo
 
-                     enddo
+              !       enddo
 
-                   end associate
+              !     end associate
                    vec(pos) = vec(pos) + rtmp
                 enddo
 
@@ -643,75 +650,75 @@ do j2_prim=1,j2_OrbSystem%n_prim
                    stop
                 endif
 
-                associate(elms => Two%r12(offset_t + only_t)%elms)
+               ! associate(elms => Two%r12(offset_t + only_t)%elms)
 
-                  if(ijklorder) then
+               !   if(ijklorder) then
 
-                     j2_pos = j2_OrbSpec%offset
-                     do j2=0,j2_OrbSpec%irange
-                        j2_pos = j2_pos + 1
-                        j1_pos = j1_OrbSpec%offset
-                        do j1=0,j1_OrbSpec%irange
-                           j1_pos = j1_pos + 1
+               !      j2_pos = j2_OrbSpec%offset
+               !      do j2=0,j2_OrbSpec%irange
+               !         j2_pos = j2_pos + 1
+               !         j1_pos = j1_OrbSpec%offset
+               !         do j1=0,j1_OrbSpec%irange
+               !            j1_pos = j1_pos + 1
 
-                           pos_v = offset_uv + j1 + j2
-                           rtmp  = 0._prec
+               !            pos_v = offset_uv + j1 + j2
+               !            rtmp  = 0._prec
 
-                           i2_pos = i2_OrbSpec%offset
-                           do i2=0,i2_OrbSpec%irange
-                              i2_pos = i2_pos + 1
-                              i1_pos = i1_OrbSpec%offset
-                              do i1=0,i1_OrbSpec%irange
-                                 i1_pos = i1_pos + 1
+               !            i2_pos = i2_OrbSpec%offset
+               !            do i2=0,i2_OrbSpec%irange
+               !               i2_pos = i2_pos + 1
+               !               i1_pos = i1_OrbSpec%offset
+               !               do i1=0,i1_OrbSpec%irange
+               !                  i1_pos = i1_pos + 1
 
-                                 rtmp = rtmp &
-                                      + i1_vector(i1_pos)*i2_vector(i2_pos) &
-                                      * elms(offset_uv + i1 + i2,pos_v)
+               !                  rtmp = rtmp &
+               !                       + i1_vector(i1_pos)*i2_vector(i2_pos) &
+               !                       * elms(offset_uv + i1 + i2,pos_v)
 
-                              enddo
-                           enddo
+               !               enddo
+               !            enddo
 
-                           val = val + rtmp &
-                                * j1_vector(j1_pos)*j2_vector(j2_pos)
+               !            val = val + rtmp &
+               !                 * j1_vector(j1_pos)*j2_vector(j2_pos)
 
-                        enddo
-                     enddo
+               !         enddo
+               !      enddo
 
-                  else
+               !   else
 
-                     i2_pos = i2_OrbSpec%offset
-                     do i2=0,i2_OrbSpec%irange
-                        i2_pos = i2_pos + 1
-                        i1_pos = i1_OrbSpec%offset
-                        do i1=0,i1_OrbSpec%irange
-                           i1_pos = i1_pos + 1
+               !      i2_pos = i2_OrbSpec%offset
+               !      do i2=0,i2_OrbSpec%irange
+               !         i2_pos = i2_pos + 1
+               !         i1_pos = i1_OrbSpec%offset
+               !         do i1=0,i1_OrbSpec%irange
+               !            i1_pos = i1_pos + 1
 
-                           pos_v = offset_uv + i1 + i2
-                           rtmp  = 0._prec
+               !            pos_v = offset_uv + i1 + i2
+               !            rtmp  = 0._prec
 
-                           j2_pos = j2_OrbSpec%offset
-                           do j2=0,j2_OrbSpec%irange
-                              j2_pos = j2_pos + 1
-                              j1_pos = j1_OrbSpec%offset
-                              do j1=0,j1_OrbSpec%irange
-                                 j1_pos = j1_pos + 1
+               !            j2_pos = j2_OrbSpec%offset
+               !            do j2=0,j2_OrbSpec%irange
+               !               j2_pos = j2_pos + 1
+               !               j1_pos = j1_OrbSpec%offset
+               !               do j1=0,j1_OrbSpec%irange
+               !                  j1_pos = j1_pos + 1
 
-                                 rtmp = rtmp &
-                                      + j1_vector(j1_pos)*j2_vector(j2_pos) &
-                                      * elms(offset_uv + j1 + j2,pos_v)
+               !                  rtmp = rtmp &
+               !                       + j1_vector(j1_pos)*j2_vector(j2_pos) &
+               !                       * elms(offset_uv + j1 + j2,pos_v)
 
-                              enddo
-                           enddo
+               !               enddo
+               !            enddo
 
-                           val = val + rtmp &
-                                * i1_vector(i1_pos)*i2_vector(i2_pos)
+               !            val = val + rtmp &
+               !                 * i1_vector(i1_pos)*i2_vector(i2_pos)
 
-                        enddo
-                     enddo
+               !         enddo
+               !      enddo
 
-                  endif
+               !   endif
 
-                end associate
+               ! end associate
 
               end associate
 
@@ -757,6 +764,7 @@ implicit none
 integer,intent(in) :: Nexp
 real(prec),intent(in) :: exponents(:)
 integer :: iexp,jexp,kexp,lexp,iTwo
+integer :: ilam
 
 iTwo = Nexp*(Nexp+1)/2
 allocate(TwoInt(iTwo*(iTwo+1)/2))
@@ -779,7 +787,13 @@ do lexp=1,Nexp
               Two%ijalphaMI = exponents(Two%iexp) - exponents(Two%jexp)
               Two%klalphaPL = exponents(Two%kexp) + exponents(Two%lexp)
               Two%klalphaMI = exponents(Two%kexp) - exponents(Two%lexp)
-              Two%range_t   = smallest_t - 1
+              !Two%range_t   = smallest_t - 1
+              ! HERE
+              do ilam=0,2
+                 associate(TwoL => Two%ILambda(ilam))
+                   TwoL%range_t   = smallest_t - 1
+                 end associate
+              enddo
 
             end associate
          enddo
@@ -801,6 +815,12 @@ integer :: i_prim,j_prim
 integer :: iexp,jexp,kexp,lexp,iTwo
 logical :: ijorder,klorder,ijklorder
 integer :: range_ti,range_tj,range_t
+integer :: igen,jgen,jGenMax
+integer :: ilam,numlam
+integer,allocatable :: jGenNum(:),lam(:)
+
+call mem_alloc(jGenNum,2)
+jGenNum = 0
 
 do j_prim=1,size(PairReduced)
    do i_prim=1,j_prim
@@ -809,20 +829,23 @@ do j_prim=1,size(PairReduced)
            jPairSpec => PairReduced(j_prim))
         if(iPairSpec%isUsed.and.jPairSpec%isUsed) then
 
-           range_ti = maxt_PairReduced(iPairSpec,smallest_t)
-           range_tj = maxt_PairReduced(jPairSpec,smallest_t)
-           if((range_ti<smallest_t).or.(range_tj<smallest_t)) then
-              write(LOUT,'(a)') 'ERROR!!! &
-                   &It is impossible to determine max t range in init2_TwoInt!'
-              stop
-           endif
+          ! range_ti = maxt_PairReduced(iPairSpec,smallest_t)
+          ! range_tj = maxt_PairReduced(jPairSpec,smallest_t)
+          ! if((range_ti<smallest_t).or.(range_tj<smallest_t)) then
+          !    write(LOUT,'(a)') 'ERROR!!! &
+          !         &It is impossible to determine max t range in init2_TwoInt!'
+          !    stop
+          ! endif
 
-           range_t = range_ti + range_tj
+          ! range_t = range_ti + range_tj
 
+           ! A part
            iexp = iPairSpec%iexp1
            jexp = jPairSpec%iexp1
            kexp = iPairSpec%iexp2
            lexp = jPairSpec%iexp2
+
+           !write(*,*) 'u:',iexp,kexp,jexp,lexp
            call order_exp(iTwo,ijorder,klorder,ijklorder,iexp,jexp,kexp,lexp)
 
            associate(Two => TwoInt(iTwo))
@@ -833,18 +856,109 @@ do j_prim=1,size(PairReduced)
                 stop
              endif
 
-             Two%isUsed  = .true.
-             Two%range_t = max(Two%range_t,range_t)
+            ! loop over generators
+            do igen=1,iPairSpec%n_gen
+               associate(iPairSpecG => iPairSpec%PairReduced_G(igen),&
+                         iPairGen => iPairSpec%PairReduced_G(igen)%gen_type)
+!                 write(*,*) 'o:',iexp,kexp,jexp,lexp
+!                 write(*,*) ''
+                 call check_gen_pairs(iPairSpecG,jPairSpec,jGenMax,jGenNum)
+                 if(jGenMax.eq.0) cycle
+                 do jgen=1,jGenMax
+                    associate(jPairSpecG => jPairSpec%PairReduced_G(jGenNum(jgen)),&
+                              jPairGen => jPairSpec%PairReduced_G(jGenNum(jgen))%gen_type)
+                             
+                    ! write(*,*) 'iGen:',iPairSpecG%gen_type,'jGen',jPairSpecG%gen_type
+                      range_ti = maxt_PairReduced(iPairSpecG,smallest_t)
+                      range_tj = maxt_PairReduced(jPairSpecG,smallest_t)
+                      if((range_ti<smallest_t).or.(range_tj<smallest_t)) then
+                         write(LOUT,'(a)') 'ERROR!!! &
+                         &It is impossible to determine max t range in init2_TwoInt!'
+                         stop
+                      endif
 
+                      range_t = range_ti + range_tj
+                      Two%isUsed  = .true.
+
+                      ! ATTENTION!!!  
+                      ! ordering of generators
+                      ! according to possible_generators 
+                      if(iPairGen==jPairGen) then
+                         select case(iPairGen)
+                         case(3,4,6)
+
+                             numlam = 2
+                             call mem_alloc(lam,numlam)
+                             lam(1) = 0
+                             lam(2) = 2
+                         !   Two%isUsed  = .true.
+                         !   Two%ILambda(0)%range_t = &
+                         !       max(Two%ILambda(0)%range_t,range_t)
+                         !   Two%ILambda(2)%range_t = &
+                         !       max(Two%ILambda(2)%range_t,range_t)
+
+                        !write(*,*) 'iGen:',iPairGen,'jGen',jPairGen
+                        !write(*,*) 'Lambda: (0, 2)'
+                         case(1,2,5)
+
+                             numlam = 1
+                             call mem_alloc(lam,numlam)
+                             lam(1) = 0
+                         !   Two%isUsed  = .true.
+                         !   Two%ILambda(0)%range_t = &
+                         !       max(Two%ILambda(0)%range_t,range_t)
+                         !write(*,*) 'iGen:',iPairGen,'jGen',jPairGen
+                         !write(*,*) 'Lambda: (0)'
+                         case default
+                            write(LOUT,'(a)') 'Incorrect generator number &
+                                             & in init2_TwoInt'
+                            stop
+                         end select
+                      else
+
+                         numlam = 1
+                         call mem_alloc(lam,numlam)
+                         lam(1) = 1
+                         !Two%isUsed  = .true.
+                         !Two%ILambda(1)%range_t = &
+                         !    max(Two%ILambda(1)%range_t,range_t)
+                        !write(*,*) 'iGen:',iPairGen,'jGen',jPairGen
+                        !write(*,*) 'Lambda: (1)'
+                      endif
+
+! hapka: old_drake
+!                range_t = range_ti + range_tj
+!                Two%isUsed  = .true.
+!                Two%range_t = max(Two%range_t,range_t)
+
+                      do ilam=1,numlam
+                         associate(TwoL => Two%ILambda(lam(ilam)))
+                           !Two%isUsed  = .true.
+                           TwoL%range_t = &
+                               max(TwoL%range_t,range_t)
+                         end associate     
+                      enddo
+                      !write(*,*) 'iGen:',iPairGen,'jGen',jPairGen
+                      !write(*,*) 'Lambda ',lam
+
+                      call mem_dealloc(lam)
+
+                    end associate
+                 enddo
+               end associate 
+            enddo
            end associate
 
+         ! B part
            iexp = iPairSpec%iexp1
            jexp = jPairSpec%iexp2
            kexp = iPairSpec%iexp2
            lexp = jPairSpec%iexp1
+
+ !          write(*,*) 'u:',iexp,kexp,jexp,lexp
            call order_exp(iTwo,ijorder,klorder,ijklorder,iexp,jexp,kexp,lexp)
 
-           associate(Two => TwoInt(iTwo))
+          associate(Two => TwoInt(iTwo))
              if(iexp/=Two%iexp.or.jexp/=Two%jexp.or.&
                   kexp/=Two%kexp.or.lexp/=Two%lexp) then
                 write(LOUT,'(a)') 'ERROR!!! &
@@ -852,15 +966,119 @@ do j_prim=1,size(PairReduced)
                 stop
              endif
 
-             Two%isUsed  = .true.
-             Two%range_t = max(Two%range_t,range_t)
+            ! loop over generators
+            do igen=1,iPairSpec%n_gen
+               associate(iPairSpecG => iPairSpec%PairReduced_G(igen),&
+                         iPairGen => iPairSpec%PairReduced_G(igen)%gen_type)
+!                 write(*,*) 'o:',iexp,kexp,jexp,lexp
+!                 write(*,*) ''
+                 call check_gen_pairs(iPairSpecG,jPairSpec,jGenMax,jGenNum)
+                 if(jGenMax.eq.0) cycle
+                 do jgen=1,jGenMax
+                    associate(jPairSpecG => jPairSpec%PairReduced_G(jGenNum(jgen)),&
+                              jPairGen => jPairSpec%PairReduced_G(jGenNum(jgen))%gen_type)
+                             
+                    ! write(*,*) 'iGen:',iPairSpecG%gen_type,'jGen',jPairSpecG%gen_type
+                      range_ti = maxt_PairReduced(iPairSpecG,smallest_t)
+                      range_tj = maxt_PairReduced(jPairSpecG,smallest_t)
+                      if((range_ti<smallest_t).or.(range_tj<smallest_t)) then
+                         write(LOUT,'(a)') 'ERROR!!! &
+                         &It is impossible to determine max t range in init2_TwoInt!'
+                         stop
+                      endif
 
-           end associate
+                      range_t = range_ti + range_tj
+
+                      ! ATTENTION!!!  
+                      ! ordering of generators
+                      ! according to possible_generators 
+                      if(iPairGen==jPairGen) then
+                        select case(iPairGen)
+                        case(3,4,6)
+                           numlam = 2
+                           call mem_alloc(lam,numlam)
+                           lam(1) = 0
+                           lam(2) = 2
+
+                        !    Two%isUsed  = .true.
+                        !    Two%ILambda(0)%range_t = &
+                        !        max(Two%ILambda(0)%range_t,range_t)
+                        !    Two%ILambda(2)%range_t = &
+                        !        max(Two%ILambda(2)%range_t,range_t)
+                        !  
+                        ! write(*,*) 'iGen:',iPairGen,'jGen',jPairGen
+                        ! write(*,*) 'Lambda: (0, 2)'
+                         case(1)
+                            numlam = 1
+                            call mem_alloc(lam,numlam)
+                            lam(1) = 0
+
+                        !    Two%isUsed  = .true.
+                        !    Two%ILambda(0)%range_t = &
+                        !        max(Two%ILambda(0)%range_t,range_t)
+                        ! write(*,*) 'iGen:',iPairGen,'jGen',jPairGen
+                        ! write(*,*) 'Lambda: (0)'
+                         case(2)
+                            numlam = 1
+                            call mem_alloc(lam,numlam)
+                            lam(1) = 1
+
+                        !    Two%isUsed  = .true.
+                        !    Two%ILambda(1)%range_t = &
+                        !        max(Two%ILambda(1)%range_t,range_t)
+                        !    write(*,*) 'iGen:',iPairGen,'jGen',jPairGen
+                        !    write(*,*) 'Lambda: (1)'
+                         case(5)
+                            numlam = 1
+                            call mem_alloc(lam,numlam)
+                            lam(1) = 2
+
+                        !    Two%isUsed  = .true.
+                        !    Two%ILambda(2)%range_t = &
+                        !        max(Two%ILambda(2)%range_t,range_t)
+                        !    write(*,*) 'iGen:',iPairGen,'jGen',jPairGen
+                        !    write(*,*) 'Lambda: (2)'
+                         end select
+                      else 
+                         numlam = 1
+                         call mem_alloc(lam,numlam)
+                         lam(1) = 1
+
+                        ! Two%isUsed  = .true.
+                        ! Two%ILambda(1)%range_t = &
+                        !     max(Two%ILambda(1)%range_t,range_t)
+                        ! write(*,*) 'iGen:',iPairGen,'jGen',jPairGen
+                        ! write(*,*) 'Lambda: (1)'
+                      endif
+! hapka: old_drake
+!                range_t = range_ti + range_tj
+!                Two%isUsed  = .true.
+!                Two%range_t = max(Two%range_t,range_t)
+
+                      do ilam=1,numlam
+                         associate(TwoL => Two%ILambda(lam(ilam)))
+                           !Two%isUsed  = .true.
+                           TwoL%range_t = &
+                               max(TwoL%range_t,range_t)
+                         end associate     
+                      enddo
+                      !write(*,*) 'iGen:',iPairGen,'jGen',jPairGen
+                      !write(*,*) 'Lambda ',lam
+
+                      call mem_dealloc(lam)
+
+                    end associate
+                 enddo
+               end associate 
+            enddo
+          end associate
 
         endif
       end associate
    enddo
 enddo
+
+call mem_dealloc(jGenNum)
 
 end subroutine init2_TwoInt
 
@@ -872,9 +1090,17 @@ integer :: iexp,jexp,kexp,lexp,iTwo
 logical :: ijorder,klorder,ijklorder
 integer :: ti,tj,pos_ti,pos_tj,range_ti,range_tj
 integer :: t,pos_t,max_t
+integer :: add_to_uv(2)
 integer,allocatable :: range_uvi(:,:),range_uvj(:,:)
 logical,allocatable :: used_uvi(:),used_uvj(:)
 integer :: i
+integer :: ilam
+integer :: numlam
+integer :: igen,jgen,jGenMax
+integer,allocatable :: jGenNum(:),lam(:)
+
+call mem_alloc(jGenNum,2)
+jGenNum = 0
 
 max_t = smallest_t - 1
 
@@ -882,14 +1108,31 @@ do iTwo=1,size(TwoInt)
    associate(Two => TwoInt(iTwo))
      if(Two%isUsed) then
 
-        max_t = max(max_t,Two%range_t)
+        do ilam=0,2
+           associate(TwoL => Two%ILambda(ilam))
+             max_t = max(max_t,TwoL%range_t)
 
-        call mem_alloc(Two%range_uv,2,Two%range_t-smallest_t+1)
-        Two%range_uv = smallest_uv - 1
-
+             call mem_alloc(TwoL%range_uv,2,TwoL%range_t-smallest_t+1)
+             TwoL%range_uv = smallest_uv - 1
+           end associate
+        enddo
      endif
    end associate
 enddo
+
+! hapka: old_drake
+!do iTwo=1,size(TwoInt)
+!   associate(Two => TwoInt(iTwo))
+!     if(Two%isUsed) then
+!
+!        max_t = max(max_t,Two%range_t)
+!
+!        call mem_alloc(Two%range_uv,2,Two%range_t-smallest_t+1)
+!        Two%range_uv = smallest_uv - 1
+!
+!     endif
+!   end associate
+!enddo
 
 max_t = max_t - smallest_t + 1
 
@@ -904,35 +1147,37 @@ do j_prim=1,size(PairReduced)
            iPairSpec => PairReduced(i_prim), &
            jPairSpec => PairReduced(j_prim))
         if(iPairSpec%isUsed.and.jPairSpec%isUsed) then
-
-           range_ti = maxt_PairReduced(iPairSpec,smallest_t)
-           range_tj = maxt_PairReduced(jPairSpec,smallest_t)
-           if((range_ti<smallest_t).or.(range_tj<smallest_t)) then
-              write(LOUT,'(a)') 'ERROR!!! &
-                   &It is impossible to determine max t range in init3_TwoInt!'
-              stop
-           endif
-
-           range_uvi = smallest_uv - 1
-           used_uvi  = .false.
-           do ti=0,range_ti
-              pos_ti = offset_t + ti
-              range_uvi(:,pos_ti) = maxuv_PairReduced(ti,iPairSpec,smallest_uv)
-              used_uvi(pos_ti)    = all(range_uvi(:,pos_ti)>=smallest_uv)
-           enddo
-
-           range_uvj = smallest_uv - 1
-           used_uvj  = .false.
-           do tj=0,range_tj
-              pos_tj = offset_t + tj
-              range_uvj(:,pos_tj) = maxuv_PairReduced(tj,jPairSpec,smallest_uv)
-              used_uvj(pos_tj)    = all(range_uvj(:,pos_tj)>=smallest_uv)
-           enddo
-
+! hapka: old_drake
+!           range_ti = maxt_PairReduced(iPairSpec,smallest_t)
+!           range_tj = maxt_PairReduced(jPairSpec,smallest_t)
+!           if((range_ti<smallest_t).or.(range_tj<smallest_t)) then
+!              write(LOUT,'(a)') 'ERROR!!! &
+!                   &It is impossible to determine max t range in init3_TwoInt!'
+!              stop
+!           endif
+!
+!           range_uvi = smallest_uv - 1
+!           used_uvi  = .false.
+!           do ti=0,range_ti
+!              pos_ti = offset_t + ti
+!              range_uvi(:,pos_ti) = maxuv_PairReduced(ti,iPairSpec,smallest_uv)
+!              used_uvi(pos_ti)    = all(range_uvi(:,pos_ti)>=smallest_uv)
+!           enddo
+!
+!           range_uvj = smallest_uv - 1
+!           used_uvj  = .false.
+!           do tj=0,range_tj
+!              pos_tj = offset_t + tj
+!              range_uvj(:,pos_tj) = maxuv_PairReduced(tj,jPairSpec,smallest_uv)
+!              used_uvj(pos_tj)    = all(range_uvj(:,pos_tj)>=smallest_uv)
+!           enddo
+!
+           ! A part  
            iexp = iPairSpec%iexp1
            jexp = jPairSpec%iexp1
            kexp = iPairSpec%iexp2
            lexp = jPairSpec%iexp2
+           write(*,*) 'u:',iexp,kexp,jexp,lexp
            call order_exp(iTwo,ijorder,klorder,ijklorder,iexp,jexp,kexp,lexp)
 
            associate(Two => TwoInt(iTwo))
@@ -948,46 +1193,209 @@ do j_prim=1,size(PairReduced)
                 stop
              endif
 
-             if(ijklorder) then
+!            write(*,*) 'o:',iexp,kexp,jexp,lexp,ijklorder
+!            write(*,*) ''
+            ! loop over generators
+             do igen=1,iPairSpec%n_gen
+                associate(iPairSpecG => iPairSpec%PairReduced_G(igen),&
+                          iPairGen => iPairSpec%PairReduced_G(igen)%gen_type)
+                  call check_gen_pairs(iPairSpecG,jPairSpec,jGenMax,jGenNum)
+                  if(jGenMax.eq.0) cycle
+                  do jgen=1,jGenMax
+                     associate(jPairSpecG => jPairSpec%PairReduced_G(jGenNum(jgen)),&
+                               jPairGen => jPairSpec%PairReduced_G(jGenNum(jgen))%gen_type)
+                             
+                     !write(*,*) 'iGen:',iPairSpecG%gen_type,'jGen',jPairSpecG%gen_type
+                       range_ti = maxt_PairReduced(iPairSpecG,smallest_t)
+                       range_tj = maxt_PairReduced(jPairSpecG,smallest_t)
+                       if((range_ti<smallest_t).or.(range_tj<smallest_t)) then
+                          write(LOUT,'(a)') 'ERROR!!! &
+                          &It is impossible to determine max t range in init3_TwoInt!'
+                          stop
+                       endif
 
-                do tj=0,range_tj
-                   pos_tj = offset_t + tj
-                   do ti=0,range_ti
-                      pos_ti = offset_t + ti
-                      if(used_uvi(pos_ti).and.used_uvj(pos_tj)) then
-                         pos_t = offset_t + ti + tj
+                       range_uvi = smallest_uv - 1
+                       used_uvi  = .false.
+                       do ti=0,range_ti
+                          pos_ti = offset_t + ti
+                          range_uvi(:,pos_ti) = maxuv_PairReduced(ti,iPairSpecG,smallest_uv)
+                          used_uvi(pos_ti)    = all(range_uvi(:,pos_ti)>=smallest_uv)
+                       enddo
 
-                         Two%range_uv(1,pos_t) = max(Two%range_uv(1,pos_t),&
-                              range_uvi(1,pos_ti) + range_uvj(1,pos_tj))
-                         Two%range_uv(2,pos_t) = max(Two%range_uv(2,pos_t),&
-                              range_uvi(2,pos_ti) + range_uvj(2,pos_tj))
+                       range_uvj = smallest_uv - 1
+                       used_uvj  = .false.
+                       do tj=0,range_tj
+                          pos_tj = offset_t + tj
+                          range_uvj(:,pos_tj) = maxuv_PairReduced(tj,jPairSpecG,smallest_uv)
+                          used_uvj(pos_tj)    = all(range_uvj(:,pos_tj)>=smallest_uv)
+                       enddo
 
-                      endif
-                   enddo
-                enddo
+                     ! ATTENTION!!!  
+                     ! ordering of generators
+                     ! according to possible_generators 
+                       add_to_uv = 0
+                       if(iPairGen==jPairGen) then
+                          ! even generators
+                          select case(iPairGen)
+                          case(3,4,6)
+                            numlam = 2
+                            call mem_alloc(lam,numlam)
+                            lam(1) = 0
+                            lam(2) = 2
+                            add_to_uv(1) = 2
+                            add_to_uv(2) = 2
 
-             else
+                          case(1,2,5) 
+                            numlam = 1
+                            call mem_alloc(lam,numlam)
+                            lam(1) = 0
 
-                do tj=0,range_tj
-                   pos_tj = offset_t + tj
-                   do ti=0,range_ti
-                      pos_ti = offset_t + ti
-                      if(used_uvi(pos_ti).and.used_uvj(pos_tj)) then
-                         pos_t = offset_t + ti + tj
+                            select case(iPairGen)
+                            case(1)
+                               add_to_uv = 0
+                            case(2)
+                               add_to_uv(1) = 0
+                               add_to_uv(2) = 2
+                            case(5)
+                               add_to_uv(1) = 0
+                               add_to_uv(2) = 4
+                            case default
+                               write(LOUT,'()') 'Incorrect even pair &
+                                   & generator number in init3_TwoInt'
+                               stop
+                            end select  
 
-                         Two%range_uv(1,pos_t) = max(Two%range_uv(1,pos_t),&
-                              range_uvi(2,pos_ti) + range_uvj(2,pos_tj))
-                         Two%range_uv(2,pos_t) = max(Two%range_uv(2,pos_t),&
-                              range_uvi(1,pos_ti) + range_uvj(1,pos_tj))
+                          case default
+                             write(LOUT,'(a)') 'Incorrect even pair & 
+                                  &  generator number in init3_TwoInt'
+                             stop
+                          end select
 
-                      endif
-                   enddo
-                enddo
+                       else ! odd generators
+                          numlam = 1
+                          call mem_alloc(lam,numlam)
+                          lam(1) = 1
 
-             endif
+                          select case(iPairGen)
+                          case(1,6)
+                             add_to_uv = 1
+                          case(4,5)
+                             add_to_uv(1) = 1
+                             add_to_uv(2) = 3
+                          case default
+                             write(LOUT,'(a)') 'Incorrect odd pair &
+                                & generator number in init3_TwoInt '
+                          end select
+                       endif  
 
+
+                       !write(*,*) 'iGen:',iPairSpecG%gen_type,'jGen',jPairSpecG%gen_type
+                       !write(*,*) 'Lambda   ', lam
+                       !write(*,*) 'add_to_uv', add_to_uv
+
+                       if(ijklorder) then
+
+                       do tj=0,range_tj
+                          pos_tj = offset_t + tj
+                          do ti=0,range_ti
+                             pos_ti = offset_t + ti
+                             if(used_uvi(pos_ti).and.used_uvj(pos_tj)) then
+                                pos_t = offset_t + ti + tj
+
+                                do ilam=1,numlam
+                                   associate(TwoL => Two%ILambda(lam(ilam)))
+ 
+                                     TwoL%range_uv(1,pos_t) = max(TwoL%range_uv(1,pos_t),&
+                                          range_uvi(1,pos_ti) + range_uvj(1,pos_tj) + &
+                                          add_to_uv(1))
+                                     TwoL%range_uv(2,pos_t) = max(TwoL%range_uv(2,pos_t),&
+                                          range_uvi(2,pos_ti) + range_uvj(2,pos_tj) + &
+                                          add_to_uv(2))
+
+                                   end associate
+                                enddo     
+ 
+                             endif
+                          enddo
+                       enddo
+
+                       else
+
+                       do tj=0,range_tj
+                          pos_tj = offset_t + tj
+                          do ti=0,range_ti
+                             pos_ti = offset_t + ti
+                             if(used_uvi(pos_ti).and.used_uvj(pos_tj)) then
+                                pos_t = offset_t + ti + tj
+
+                                do ilam=1,numlam
+                                   associate(TwoL => Two%ILambda(lam(ilam)))
+
+                                   TwoL%range_uv(1,pos_t) = max(TwoL%range_uv(1,pos_t),&
+                                     range_uvi(2,pos_ti) + range_uvj(2,pos_tj) + &
+                                     add_to_uv(2))
+                                   TwoL%range_uv(2,pos_t) = max(TwoL%range_uv(2,pos_t),&
+                                     range_uvi(1,pos_ti) + range_uvj(1,pos_tj) + &
+                                     add_to_uv(1))
+
+                                   end associate  
+                                enddo
+ 
+                             endif
+                          enddo
+                       enddo
+
+                   endif
+
+                        call mem_dealloc(lam)
+                     end associate
+                  enddo
+                end associate
+             enddo
            end associate
 
+! hapka: old_drake (A part)
+!             if(ijklorder) then
+!
+!                do tj=0,range_tj
+!                   pos_tj = offset_t + tj
+!                   do ti=0,range_ti
+!                      pos_ti = offset_t + ti
+!                      if(used_uvi(pos_ti).and.used_uvj(pos_tj)) then
+!                         pos_t = offset_t + ti + tj
+!
+!                         Two%range_uv(1,pos_t) = max(Two%range_uv(1,pos_t),&
+!                              range_uvi(1,pos_ti) + range_uvj(1,pos_tj))
+!                         Two%range_uv(2,pos_t) = max(Two%range_uv(2,pos_t),&
+!                              range_uvi(2,pos_ti) + range_uvj(2,pos_tj))
+!
+!                      endif
+!                   enddo
+!                enddo
+!
+!             else
+!
+!                do tj=0,range_tj
+!                   pos_tj = offset_t + tj
+!                   do ti=0,range_ti
+!                      pos_ti = offset_t + ti
+!                      if(used_uvi(pos_ti).and.used_uvj(pos_tj)) then
+!                         pos_t = offset_t + ti + tj
+!
+!                         Two%range_uv(1,pos_t) = max(Two%range_uv(1,pos_t),&
+!                              range_uvi(2,pos_ti) + range_uvj(2,pos_tj))
+!                         Two%range_uv(2,pos_t) = max(Two%range_uv(2,pos_t),&
+!                              range_uvi(1,pos_ti) + range_uvj(1,pos_tj))
+!
+!                      endif
+!                   enddo
+!                enddo
+!
+!             endif
+!          end associate
+!
+!          B part
+           write(*,*) 'B-part'
            iexp = iPairSpec%iexp1
            jexp = jPairSpec%iexp2
            kexp = iPairSpec%iexp2
@@ -1007,44 +1415,202 @@ do j_prim=1,size(PairReduced)
                 stop
              endif
 
-             if(ijklorder) then
+            write(*,*) 'o:',iexp,kexp,jexp,lexp,ijklorder
+            write(*,*) ''
+            ! loop over generators
+             do igen=1,iPairSpec%n_gen
+                associate(iPairSpecG => iPairSpec%PairReduced_G(igen),&
+                          iPairGen => iPairSpec%PairReduced_G(igen)%gen_type)
+                  call check_gen_pairs(iPairSpecG,jPairSpec,jGenMax,jGenNum)
+                  if(jGenMax.eq.0) cycle
+                  do jgen=1,jGenMax
+                     associate(jPairSpecG => jPairSpec%PairReduced_G(jGenNum(jgen)),&
+                               jPairGen => jPairSpec%PairReduced_G(jGenNum(jgen))%gen_type)
+                             
+                       range_ti = maxt_PairReduced(iPairSpecG,smallest_t)
+                       range_tj = maxt_PairReduced(jPairSpecG,smallest_t)
+                       if((range_ti<smallest_t).or.(range_tj<smallest_t)) then
+                          write(LOUT,'(a)') 'ERROR!!! &
+                          &It is impossible to determine max t range in init3_TwoInt!'
+                          stop
+                       endif
 
-                do tj=0,range_tj
-                   pos_tj = offset_t + tj
-                   do ti=0,range_ti
-                      pos_ti = offset_t + ti
-                      if(used_uvi(pos_ti).and.used_uvj(pos_tj)) then
-                         pos_t = offset_t + ti + tj
+                       range_uvi = smallest_uv - 1
+                       used_uvi  = .false.
+                       do ti=0,range_ti
+                          pos_ti = offset_t + ti
+                          range_uvi(:,pos_ti) = maxuv_PairReduced(ti,iPairSpecG,smallest_uv)
+                          used_uvi(pos_ti)    = all(range_uvi(:,pos_ti)>=smallest_uv)
+                       enddo
 
-                         Two%range_uv(1,pos_t) = max(Two%range_uv(1,pos_t),&
-                              range_uvi(1,pos_ti) + range_uvj(2,pos_tj))
-                         Two%range_uv(2,pos_t) = max(Two%range_uv(2,pos_t),&
-                              range_uvi(2,pos_ti) + range_uvj(1,pos_tj))
+                       range_uvj = smallest_uv - 1
+                       used_uvj  = .false.
+                       do tj=0,range_tj
+                          pos_tj = offset_t + tj
+                          range_uvj(:,pos_tj) = maxuv_PairReduced(tj,jPairSpecG,smallest_uv)
+                          used_uvj(pos_tj)    = all(range_uvj(:,pos_tj)>=smallest_uv)
+                       enddo
 
-                      endif
-                   enddo
-                enddo
+                     ! ATTENTION!!!  
+                     ! ordering of generators
+                     ! according to possible_generators 
+                       add_to_uv = 0
+                       if(iPairGen==jPairGen) then
+                          ! even generators
+                          select case(iPairGen)
+                          case(3,4,6)
+                             numlam = 2
+                             call mem_alloc(lam,numlam)
+                             lam(1) = 0
+                             lam(2) = 2
+                             add_to_uv(1) = 2
+                             add_to_uv(2) = 2
+                          case(1,2,5)
+                             numlam = 1
+                             call mem_alloc(lam,numlam)
 
-             else
+                             select case(iPairGen)
+                             case(1)
+                                lam(1) = 0
+                                add_to_uv = 0
+                             case(2)
+                                lam(1) = 1
+                                add_to_uv(1) = 1
+                                add_to_uv(2) = 1
+                             case(5)
+                                lam(1) = 2
+                                add_to_uv(1) = 2
+                                add_to_uv(2) = 2
+                             case default
+                                write(LOUT,'()') 'Incorrect even pair &
+                                    & genererator number in init3_TwoInt &
+                                    & (B part) '
+                                stop
+                             end select
+                           case default
+                              write(LOUT,'()') 'Incorrect even pair &
+                                  & genererator number in init3_TwoInt &
+                                  & (B part) '
+                              stop
+                          end select
+                       else ! odd generators
+                          numlam = 1
+                          call mem_alloc(lam,numlam)
+                          lam(1) = 1
+                          select case(iPairGen)
+                          case(1,6)
+                             add_to_uv = 1
+                          case(4,5)
+                             add_to_uv(1) = 3
+                             add_to_uv(2) = 1
+                          case default
+                             write(LOUT,'(a)') 'Incorrect odd pair &
+                                & generator number in init3_TwoInt &
+                                & (B part)'
+                          end select
 
-                do tj=0,range_tj
-                   pos_tj = offset_t + tj
-                   do ti=0,range_ti
-                      pos_ti = offset_t + ti
-                      if(used_uvi(pos_ti).and.used_uvj(pos_tj)) then
-                         pos_t = offset_t + ti + tj
+                       endif
+                       ! check B part
+                       write(*,*) 'iGen:',iPairSpecG%gen_type,'jGen',jPairSpecG%gen_type
+                       write(*,*) 'Lambda   ', lam
+                       write(*,*) 'add_to_uv', add_to_uv
 
-                         Two%range_uv(1,pos_t) = max(Two%range_uv(1,pos_t),&
-                              range_uvi(2,pos_ti) + range_uvj(1,pos_tj))
-                         Two%range_uv(2,pos_t) = max(Two%range_uv(2,pos_t),&
-                              range_uvi(1,pos_ti) + range_uvj(2,pos_tj))
+                       if(ijklorder) then
+          
+                       do tj=0,range_tj
+                          pos_tj = offset_t + tj
+                          do ti=0,range_ti
+                             pos_ti = offset_t + ti
+                             if(used_uvi(pos_ti).and.used_uvj(pos_tj)) then
+                                pos_t = offset_t + ti + tj
 
-                      endif
-                   enddo
-                enddo
+                                do ilam=1,numlam
+                                   associate(TwoL => Two%ILambda(lam(ilam)))
 
-             endif
+                                     TwoL%range_uv(1,pos_t) = max(TwoL%range_uv(1,pos_t),&
+                                         range_uvi(1,pos_ti) + range_uvj(2,pos_tj) + &
+                                         add_to_uv(1))
+                                     TwoL%range_uv(2,pos_t) = max(TwoL%range_uv(2,pos_t),&
+                                         range_uvi(2,pos_ti) + range_uvj(1,pos_tj) + &
+                                         add_to_uv(2))
+                                   end associate
+                                enddo
+          
+                             endif
+                          enddo
+                       enddo
+          
+                       else
+          
+                       do tj=0,range_tj
+                          pos_tj = offset_t + tj
+                          do ti=0,range_ti
+                             pos_ti = offset_t + ti
+                             if(used_uvi(pos_ti).and.used_uvj(pos_tj)) then
+                                pos_t = offset_t + ti + tj
+                                
+                                do ilam=1,numlam
+                                   associate(TwoL => Two%ILambda(lam(ilam)))
+          
+                                     TwoL%range_uv(1,pos_t) = max(TwoL%range_uv(1,pos_t),&
+                                          range_uvi(2,pos_ti) + range_uvj(1,pos_tj) + &
+                                          add_to_uv(2))
+                                     TwoL%range_uv(2,pos_t) = max(TwoL%range_uv(2,pos_t),&
+                                          range_uvi(1,pos_ti) + range_uvj(2,pos_tj) + & 
+                                          add_to_uv(1))
+                                   end associate
+                                enddo
+          
+                             endif
+                          enddo
+                       enddo
+          
+                       endif
 
+! hapka: old_drake (B part)
+!             if(ijklorder) then
+!
+!                do tj=0,range_tj
+!                   pos_tj = offset_t + tj
+!                   do ti=0,range_ti
+!                      pos_ti = offset_t + ti
+!                      if(used_uvi(pos_ti).and.used_uvj(pos_tj)) then
+!                         pos_t = offset_t + ti + tj
+!
+!                         Two%range_uv(1,pos_t) = max(Two%range_uv(1,pos_t),&
+!                              range_uvi(1,pos_ti) + range_uvj(2,pos_tj))
+!                         Two%range_uv(2,pos_t) = max(Two%range_uv(2,pos_t),&
+!                              range_uvi(2,pos_ti) + range_uvj(1,pos_tj))
+!
+!                      endif
+!                   enddo
+!                enddo
+!
+!             else
+!
+!                do tj=0,range_tj
+!                   pos_tj = offset_t + tj
+!                   do ti=0,range_ti
+!                      pos_ti = offset_t + ti
+!                      if(used_uvi(pos_ti).and.used_uvj(pos_tj)) then
+!                         pos_t = offset_t + ti + tj
+!
+!                         Two%range_uv(1,pos_t) = max(Two%range_uv(1,pos_t),&
+!                              range_uvi(2,pos_ti) + range_uvj(1,pos_tj))
+!                         Two%range_uv(2,pos_t) = max(Two%range_uv(2,pos_t),&
+!                              range_uvi(1,pos_ti) + range_uvj(2,pos_tj))
+!
+!                      endif
+!                   enddo
+!                enddo
+!
+!             endif
+!
+                        call mem_dealloc(lam)
+                     end associate
+                  enddo
+                end associate
+             enddo
            end associate
 
         endif
@@ -1057,23 +1623,25 @@ call mem_dealloc(used_uvi)
 call mem_dealloc(range_uvj)
 call mem_dealloc(range_uvi)
 
-do iTwo=1,size(TwoInt)
-   associate(Two => TwoInt(iTwo))
-     if(Two%isUsed) then
+call mem_dealloc(jGenNum)
 
-        do t=smallest_t,Two%range_t-1
-           pos_t = offset_t + t
-
-           do i=1,min(2,Two%range_t-t)
-              Two%range_uv(:,pos_t) = &
-                   max(Two%range_uv(:,pos_t),Two%range_uv(:,pos_t+i))
-           enddo
-
-        enddo
-
-     endif
-   end associate
-enddo
+!do iTwo=1,size(TwoInt)
+!   associate(Two => TwoInt(iTwo))
+!     if(Two%isUsed) then
+!
+!        do t=smallest_t,Two%range_t-1
+!           pos_t = offset_t + t
+!
+!           do i=1,min(2,Two%range_t-t)
+!              Two%range_uv(:,pos_t) = &
+!                   max(Two%range_uv(:,pos_t),Two%range_uv(:,pos_t+i))
+!           enddo
+!
+!        enddo
+!
+!     endif
+!   end associate
+!enddo
 
 end subroutine init3_TwoInt
 
@@ -1082,91 +1650,123 @@ implicit none
 integer :: iTwo
 integer :: t,pos_t,u,v
 
-do iTwo=1,size(TwoInt)
-   associate(Two => TwoInt(iTwo))
-     if(Two%isUsed) then
-
-        allocate(Two%r12(Two%range_t-smallest_t+1))
-
-        do t=smallest_t,Two%range_t
-           pos_t = offset_t + t
-           associate(&
-                r12      => Two%r12(pos_t), &
-                range_uv => Two%range_uv(:,pos_t))
-
-             call mem_alloc(r12%elms,&
-                  range_uv(1)-smallest_uv+1,&
-                  range_uv(2)-smallest_uv+1)
-
-             if(Two%same_exp) then
-
-                do v=smallest_uv,range_uv(2)
-                   do u=smallest_uv,min(v,range_uv(1))
-                      r12%elms(offset_uv + u,offset_uv + v) = &
-                           int2_slater(u,v,t,Two%ijalphaPL,Two%klalphaPL)
-                   enddo
-                enddo
-                do v=smallest_uv,minval(range_uv)
-                   do u=v+1,minval(range_uv)
-                      r12%elms(offset_uv + u,offset_uv + v) = &
-                           r12%elms(offset_uv + v,offset_uv + u)
-                   enddo
-                enddo
-                if(range_uv(1)>range_uv(2)) then
-                   do v=smallest_uv,range_uv(2)
-                      do u=range_uv(2)+1,range_uv(1)
-                         r12%elms(offset_uv + u,offset_uv + v) = &
-                              int2_slater(u,v,t,Two%ijalphaPL,Two%klalphaPL)
-                      enddo
-                   enddo
-                endif
-
-             else
-
-                do v=smallest_uv,range_uv(2)
-                   do u=smallest_uv,range_uv(1)
-                      r12%elms(offset_uv + u,offset_uv + v) = &
-                           int2_slater(u,v,t,Two%ijalphaPL,Two%klalphaPL)
-                   enddo
-                enddo
-
-             endif
-
-           end associate
-        enddo
-
-     endif
-   end associate
-enddo
+ !do iTwo=1,size(TwoInt)
+ !   associate(Two => TwoInt(iTwo))
+ !     if(Two%isUsed) then
+ !
+ !        allocate(Two%r12(Two%range_t-smallest_t+1))
+ !
+ !        do t=smallest_t,Two%range_t
+ !           pos_t = offset_t + t
+ !           associate(&
+ !                r12      => Two%r12(pos_t), &
+ !                range_uv => Two%range_uv(:,pos_t))
+ !
+ !             call mem_alloc(r12%elms,&
+ !                  range_uv(1)-smallest_uv+1,&
+ !                  range_uv(2)-smallest_uv+1)
+ !
+ !             if(Two%same_exp) then
+ !
+ !                do v=smallest_uv,range_uv(2)
+ !                   do u=smallest_uv,min(v,range_uv(1))
+ !                      r12%elms(offset_uv + u,offset_uv + v) = &
+ !                           int2_slater(u,v,t,Two%ijalphaPL,Two%klalphaPL)
+ !                   enddo
+ !                enddo
+ !                do v=smallest_uv,minval(range_uv)
+ !                   do u=v+1,minval(range_uv)
+ !                      r12%elms(offset_uv + u,offset_uv + v) = &
+ !                           r12%elms(offset_uv + v,offset_uv + u)
+ !                   enddo
+ !                enddo
+ !                if(range_uv(1)>range_uv(2)) then
+ !                   do v=smallest_uv,range_uv(2)
+ !                      do u=range_uv(2)+1,range_uv(1)
+ !                         r12%elms(offset_uv + u,offset_uv + v) = &
+ !                              int2_slater(u,v,t,Two%ijalphaPL,Two%klalphaPL)
+ !                      enddo
+ !                   enddo
+ !                endif
+ !
+ !             else
+ !
+ !                do v=smallest_uv,range_uv(2)
+ !                   do u=smallest_uv,range_uv(1)
+ !                      r12%elms(offset_uv + u,offset_uv + v) = &
+ !                           int2_slater(u,v,t,Two%ijalphaPL,Two%klalphaPL)
+ !                   enddo
+ !                enddo
+ !
+ !             endif
+ !
+ !           end associate
+ !        enddo
+ !
+ !     endif
+ !   end associate
+ !enddo
 
 end subroutine create_Twoint
 
 subroutine free_TwoInt
 implicit none
 integer :: iTwo
+integer :: ilam
 integer :: t
 
+!do iTwo=1,size(TwoInt)
+!   associate(Two => TwoInt(iTwo))
+!     if(Two%isUsed) then
+!        do ilam=0,2
+!           associate(TwoL => Two%ILambda(ilam))
+!             do t=smallest_t,TwoL%range_t
+!                call mem_dealloc(TwoL%r12(offset_t + t)%elms)
+!             enddo
+!
+!             deallocate(TwoL%r12)
+!           end associate
+!        enddo  
+!     endif
+!   end associate
+!enddo
+
 do iTwo=1,size(TwoInt)
    associate(Two => TwoInt(iTwo))
-     if(Two%isUsed) then
 
-        do t=smallest_t,Two%range_t
-           call mem_dealloc(Two%r12(offset_t + t)%elms)
+     if(Two%isUsed) then 
+        do ilam=0,2
+           associate(TwoL => Two%ILambda(ilam))
+             call mem_dealloc(TwoL%range_uv)
+           end associate
         enddo
-
-        deallocate(Two%r12)
-
      endif
-   end associate
-enddo
-
-do iTwo=1,size(TwoInt)
-   associate(Two => TwoInt(iTwo))
-
-     if(Two%isUsed) call mem_dealloc(Two%range_uv)
 
    end associate
 enddo
+
+! hapka: old_drake
+!do iTwo=1,size(TwoInt)
+!   associate(Two => TwoInt(iTwo))
+!     if(Two%isUsed) then
+!
+!        do t=smallest_t,Two%range_t
+!           call mem_dealloc(Two%r12(offset_t + t)%elms)
+!        enddo
+!
+!        deallocate(Two%r12)
+!
+!     endif
+!   end associate
+!enddo
+!
+!do iTwo=1,size(TwoInt)
+!   associate(Two => TwoInt(iTwo))
+!
+!     if(Two%isUsed) call mem_dealloc(Two%range_uv)
+!
+!   end associate
+!enddo
 
 deallocate(TwoInt)
 
@@ -1178,46 +1778,46 @@ integer,intent(in) :: LPRINT
 integer :: iTwo
 integer :: t,pos_t,u,v
 
-if(LPRINT>=10) then
-
-   write(LOUT,'()')
-   write(LOUT,'(5x,a)') '--- CC two-electron integrals ---'
-
-   write(LOUT,'()')
-   write(LOUT,'(1x,a,2x,4(2x,a),2x,4(5x,a,1x))') &
-        'no.','i','j','k','l','ijalphaPL','ijalphaMI','klalphaPL','klalphaMI'
-   do iTwo=1,size(TwoInt)
-      associate(Two => TwoInt(iTwo))
-        write(LOUT,'(1x,i3,a)',advance='no') iTwo,' :'
-        if(Two%isUsed) then
-           write(LOUT,'(4i3,1x,a,4f15.8)') &
-                Two%iexp,Two%jexp,Two%kexp,Two%lexp,&
-                merge('*',' ',Two%same_exp),&
-                Two%ijalphaPL,Two%ijalphaMI,Two%klalphaPL,Two%klalphaMI
-           do t=smallest_t,Two%range_t
-              pos_t = offset_t + t
-              write(LOUT,'(11x,a,i3,a,6x,a,2i4)') &
-                   't = ',t,',','max_u max_v = ',Two%range_uv(:,pos_t)
-              if(LPRINT>=100) then
-                 associate(&
-                      r12      => Two%r12(pos_t), &
-                      range_uv => Two%range_uv(:,pos_t))
-                   do v=smallest_uv,range_uv(2)
-                      do u=smallest_uv,range_uv(1)
-                         write(LOUT,'(10x,2i3,a,es30.22)') u,v,' : ',&
-                              r12%elms(offset_uv + u,offset_uv + v)
-                      enddo
-                   enddo
-                 end associate
-              endif
-           enddo
-        else
-           write(LOUT,'(a)') 'NOT USED'
-        endif
-      end associate
-   enddo
-
-endif
+ if(LPRINT>=10) then
+ 
+    write(LOUT,'()')
+    write(LOUT,'(5x,a)') '--- CC two-electron integrals ---'
+! 
+!    write(LOUT,'()')
+!    write(LOUT,'(1x,a,2x,4(2x,a),2x,4(5x,a,1x))') &
+!         'no.','i','j','k','l','ijalphaPL','ijalphaMI','klalphaPL','klalphaMI'
+!    do iTwo=1,size(TwoInt)
+!       associate(Two => TwoInt(iTwo))
+!         write(LOUT,'(1x,i3,a)',advance='no') iTwo,' :'
+!         if(Two%isUsed) then
+!            write(LOUT,'(4i3,1x,a,4f15.8)') &
+!                 Two%iexp,Two%jexp,Two%kexp,Two%lexp,&
+!                 merge('*',' ',Two%same_exp),&
+!                 Two%ijalphaPL,Two%ijalphaMI,Two%klalphaPL,Two%klalphaMI
+!            do t=smallest_t,Two%range_t
+!               pos_t = offset_t + t
+!               write(LOUT,'(11x,a,i3,a,6x,a,2i4)') &
+!                    't = ',t,',','max_u max_v = ',Two%range_uv(:,pos_t)
+!!               if(LPRINT>=100) then
+!!                  associate(&
+!!                       r12      => Two%r12(pos_t), &
+!!                       range_uv => Two%range_uv(:,pos_t))
+!!                    do v=smallest_uv,range_uv(2)
+!!                       do u=smallest_uv,range_uv(1)
+!!                          write(LOUT,'(10x,2i3,a,es30.22)') u,v,' : ',&
+!!                               r12%elms(offset_uv + u,offset_uv + v)
+!!                       enddo
+!!                    enddo
+!!                  end associate
+!!               endif
+!            enddo
+!         else
+!            write(LOUT,'(a)') 'NOT USED'
+!         endif
+!       end associate
+!    enddo
+ 
+ endif
 
 end subroutine print_TwoInt
 

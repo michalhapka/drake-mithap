@@ -687,9 +687,19 @@ integer :: i,j,k,l
     call reduce_prim(sumprim_pairs,prim_all,diff_all,7)
     call create_PairReduced(System%OrbPairReduced,&
          sumprim_pairs,prim_all,diff_all,System%Nexp,System%isUsed_pairs)
-
     call check_consistency_PairReduced(System%NexpSQ,&
          System%OrbPairReduced,System%PairReduced)
+
+! check OrbPairReduced manually
+  do i=1,System%NexpSQ
+     associate(iPairSpec => System%OrbPairReduced(i))
+        write(LOUT,*) iPairSpec%iexp1,iPairSpec%iexp2
+        write(LOUT,*) iPairSpec%n_gen
+        do j=1,iPairSpec%n_gen
+           write(LOUT,*) iPairSpec%PairReduced_G(j)%gen_type
+        enddo
+     end associate
+  enddo
 
 ! hapka: old_drake
 !    call mem_alloc(expSQ_restrict,System%NexpSQ)
@@ -1115,7 +1125,7 @@ integer :: n
 integer :: prim(:,:)
 integer,intent(in) :: Nexp
 type(OrbReducedData),intent(in) :: OrbReduced(:)
-integer :: get_gen_orb(1:3) = [2,4,6]
+integer :: get_gen_orb(1:3) = [3,4,6]
 integer :: i,j,k,l,iorb
 
 do j=1,Nexp
@@ -1169,7 +1179,7 @@ do j=1,Nexp
                        prim(5,n) = OrbReduced2%max_lrange(l)-OrbReduced2%lang(l)
                        prim(6,n) = 0
                        ! P^O
-                       prim(7,n) = 3  
+                       prim(7,n) = 2  
                  endif
               enddo
            enddo

@@ -117,9 +117,9 @@ character(*),intent(in) :: name
 select case(trim(name))
 case('S^E')
 n=1
-case('P^E')
-n=2
 case('P^O')
+n=2
+case('P^E')
 n=3
 case('D^E(1)')
 n=4
@@ -139,9 +139,9 @@ select case(n)
 case(1)
 name='S^E'
 case(2)
-name='P^E'
-case(3)
 name='P^O'
+case(3)
+name='P^E'
 case(4)
 name='D^E(1)'
 case(5)

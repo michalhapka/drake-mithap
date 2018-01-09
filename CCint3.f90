@@ -867,55 +867,55 @@ integer :: i_prim,j_prim,i_orb,j_orb
 integer :: sum_12,max_12,max_3
 integer :: iThree,perm1(3),perm2(3),order2(3)
 
-do j_prim=1,size(PairReduced)
-   do i_prim=1,j_prim
-      associate(&
-           iPairSpec => PairReduced(i_prim),&
-           jPairSpec => PairReduced(j_prim))
-        if(iPairSpec%isUsed.and.jPairSpec%isUsed) then
-
-           do j_orb=1,size(OrbReduced)
-              do i_orb=1,j_orb
-                 associate(&
-                      i_OrbSpec => OrbReduced(i_orb),&
-                      j_OrbSpec => OrbReduced(j_orb))
-                   if(i_OrbSpec%isUsed.and.j_OrbSpec%isUsed) then
-
-                      sum_12 = &
-                           maxOmega_PairReduced(iPairSpec) + &
-                           maxOmega_PairReduced(jPairSpec)
-
-                      max_12 = &
-                           maxt_PairReduced(iPairSpec) + &
-                           maxt_PairReduced(jPairSpec)
-
-                      max_3 = i_OrbSpec%maxrange + j_OrbSpec%maxrange
-
-                      order2 = [1,0,0]
-                      call perm_part1(iThree,perm1,perm2,order2,&
-                           iPairSpec%iexp1,jPairSpec%iexp1,&
-                           iPairSpec%iexp2,jPairSpec%iexp2,&
-                           i_OrbSpec%iexp ,j_OrbSpec%iexp)
-                      call add_J_Spec(iThree,maxloc(order2,dim=1),&
-                           sum_12,max_12,max_3)
-
-                      order2 = [1,0,0]
-                      call perm_part1(iThree,perm1,perm2,order2,&
-                           iPairSpec%iexp1,jPairSpec%iexp2,&
-                           iPairSpec%iexp2,jPairSpec%iexp1,&
-                           i_OrbSpec%iexp ,j_OrbSpec%iexp)
-                      call add_J_Spec(iThree,maxloc(order2,dim=1),&
-                           sum_12,max_12,max_3)
-
-                   endif
-                 end associate
-              enddo
-           enddo
-
-        endif
-      end associate
-   enddo
-enddo
+!do j_prim=1,size(PairReduced)
+!   do i_prim=1,j_prim
+!      associate(&
+!           iPairSpec => PairReduced(i_prim),&
+!           jPairSpec => PairReduced(j_prim))
+!        if(iPairSpec%isUsed.and.jPairSpec%isUsed) then
+!
+!           do j_orb=1,size(OrbReduced)
+!              do i_orb=1,j_orb
+!                 associate(&
+!                      i_OrbSpec => OrbReduced(i_orb),&
+!                      j_OrbSpec => OrbReduced(j_orb))
+!                   if(i_OrbSpec%isUsed.and.j_OrbSpec%isUsed) then
+!
+!                      sum_12 = &
+!                           maxOmega_PairReduced(iPairSpec) + &
+!                           maxOmega_PairReduced(jPairSpec)
+!
+!                      max_12 = &
+!                           maxt_PairReduced(iPairSpec) + &
+!                           maxt_PairReduced(jPairSpec)
+!
+!                      max_3 = i_OrbSpec%maxrange + j_OrbSpec%maxrange
+!
+!                      order2 = [1,0,0]
+!                      call perm_part1(iThree,perm1,perm2,order2,&
+!                           iPairSpec%iexp1,jPairSpec%iexp1,&
+!                           iPairSpec%iexp2,jPairSpec%iexp2,&
+!                           i_OrbSpec%iexp ,j_OrbSpec%iexp)
+!                      call add_J_Spec(iThree,maxloc(order2,dim=1),&
+!                           sum_12,max_12,max_3)
+!
+!                      order2 = [1,0,0]
+!                      call perm_part1(iThree,perm1,perm2,order2,&
+!                           iPairSpec%iexp1,jPairSpec%iexp2,&
+!                           iPairSpec%iexp2,jPairSpec%iexp1,&
+!                           i_OrbSpec%iexp ,j_OrbSpec%iexp)
+!                      call add_J_Spec(iThree,maxloc(order2,dim=1),&
+!                           sum_12,max_12,max_3)
+!
+!                   endif
+!                 end associate
+!              enddo
+!           enddo
+!
+!        endif
+!      end associate
+!   enddo
+!enddo
 
 end subroutine init_J1_ThreeInt
 
@@ -927,56 +927,56 @@ integer :: prim,A_prim,B_prim,i_orb,j_orb
 integer :: sum_12,max_12
 integer :: iThree,perm1(3),perm2(3),order2(3)
 
-do B_prim=1,size(OrbReduced)
-   do A_prim=1,size(OrbReduced)
-      do prim=1,size(PairReduced)
-         associate(&
-              PairSpec  => PairReduced(prim),&
-              A_OrbSpec => OrbReduced(A_prim),&
-              B_OrbSpec => OrbReduced(B_prim))
-           if(PairSpec%isUsed.and.A_OrbSpec%isUsed.and.B_OrbSpec%isUsed) then
-
-              do j_orb=1,size(OrbReduced)
-                 do i_orb=1,size(OrbReduced)
-                    associate(&
-                         i_OrbSpec => OrbReduced(i_orb),&
-                         j_OrbSpec => OrbReduced(j_orb))
-                      if(i_OrbSpec%isUsed.and.j_OrbSpec%isUsed) then
-
-                         sum_12 = maxOmega_PairReduced(PairSpec)
-
-                         max_12 = maxt_PairReduced(PairSpec)
-
-                         order2 = [1,0,0]
-                         call perm_part1(iThree,perm1,perm2,order2,&
-                              PairSpec%iexp1,A_OrbSpec%iexp,&
-                              PairSpec%iexp2,j_OrbSpec%iexp,&
-                              i_OrbSpec%iexp,B_OrbSpec%iexp)
-                         call add_J_Spec(iThree,maxloc(order2,dim=1),&
-                              sum_12 + A_OrbSpec%maxrange + j_OrbSpec%maxrange,&
-                              max_12,&
-                              i_OrbSpec%maxrange + B_OrbSpec%maxrange)
-
-                         order2 = [1,0,0]
-                         call perm_part1(iThree,perm1,perm2,order2,&
-                              PairSpec%iexp1,j_OrbSpec%iexp,&
-                              PairSpec%iexp2,B_OrbSpec%iexp,&
-                              i_OrbSpec%iexp,A_OrbSpec%iexp)
-                         call add_J_Spec(iThree,maxloc(order2,dim=1),&
-                              sum_12 + j_OrbSpec%maxrange + B_OrbSpec%maxrange,&
-                              max_12,&
-                              i_OrbSpec%maxrange + A_OrbSpec%maxrange)
-
-                      endif
-                    end associate
-                 enddo
-              enddo
-
-           endif
-         end associate
-      enddo
-   enddo
-enddo
+!do B_prim=1,size(OrbReduced)
+!   do A_prim=1,size(OrbReduced)
+!      do prim=1,size(PairReduced)
+!         associate(&
+!              PairSpec  => PairReduced(prim),&
+!              A_OrbSpec => OrbReduced(A_prim),&
+!              B_OrbSpec => OrbReduced(B_prim))
+!           if(PairSpec%isUsed.and.A_OrbSpec%isUsed.and.B_OrbSpec%isUsed) then
+!
+!              do j_orb=1,size(OrbReduced)
+!                 do i_orb=1,size(OrbReduced)
+!                    associate(&
+!                         i_OrbSpec => OrbReduced(i_orb),&
+!                         j_OrbSpec => OrbReduced(j_orb))
+!                      if(i_OrbSpec%isUsed.and.j_OrbSpec%isUsed) then
+!
+!                         sum_12 = maxOmega_PairReduced(PairSpec)
+!
+!                         max_12 = maxt_PairReduced(PairSpec)
+!
+!                         order2 = [1,0,0]
+!                         call perm_part1(iThree,perm1,perm2,order2,&
+!                              PairSpec%iexp1,A_OrbSpec%iexp,&
+!                              PairSpec%iexp2,j_OrbSpec%iexp,&
+!                              i_OrbSpec%iexp,B_OrbSpec%iexp)
+!                         call add_J_Spec(iThree,maxloc(order2,dim=1),&
+!                              sum_12 + A_OrbSpec%maxrange + j_OrbSpec%maxrange,&
+!                              max_12,&
+!                              i_OrbSpec%maxrange + B_OrbSpec%maxrange)
+!
+!                         order2 = [1,0,0]
+!                         call perm_part1(iThree,perm1,perm2,order2,&
+!                              PairSpec%iexp1,j_OrbSpec%iexp,&
+!                              PairSpec%iexp2,B_OrbSpec%iexp,&
+!                              i_OrbSpec%iexp,A_OrbSpec%iexp)
+!                         call add_J_Spec(iThree,maxloc(order2,dim=1),&
+!                              sum_12 + j_OrbSpec%maxrange + B_OrbSpec%maxrange,&
+!                              max_12,&
+!                              i_OrbSpec%maxrange + A_OrbSpec%maxrange)
+!
+!                      endif
+!                    end associate
+!                 enddo
+!              enddo
+!
+!           endif
+!         end associate
+!      enddo
+!   enddo
+!enddo
 
 end subroutine init_J2_ThreeInt
 
@@ -988,79 +988,79 @@ integer :: i_prim,j_prim,i_orb,j_orb
 integer :: imax,jmax,sum_TOT,max_2,max_1
 integer :: iThree,perm1(3),perm2(3),order2(3)
 
-do j_prim=1,size(PairReduced)
-   do i_prim=1,j_prim
-      associate(&
-           iPairSpec => PairReduced(i_prim),&
-           jPairSpec => PairReduced(j_prim))
-        if(iPairSpec%isUsed.and.jPairSpec%isUsed) then
-
-           do j_orb=1,size(OrbReduced)
-              do i_orb=1,size(OrbReduced)
-                 associate(&
-                      i_OrbSpec => OrbReduced(i_orb),&
-                      j_OrbSpec => OrbReduced(j_orb))
-                   if(i_OrbSpec%isUsed.and.j_OrbSpec%isUsed) then
-
-                      sum_TOT = &
-                           maxOmega_PairReduced(iPairSpec) + &
-                           maxOmega_PairReduced(jPairSpec) + &
-                           i_OrbSpec%maxrange + &
-                           j_OrbSpec%maxrange
-
-                      max_2 = max(&
-                           maxt_PairReduced(iPairSpec),&
-                           maxt_PairReduced(jPairSpec))
-
-                      imax = maxuv_PairReduced(iPairSpec)
-                      jmax = maxuv_PairReduced(jPairSpec)
-
-                      max_1 = max(&
-                           imax + j_OrbSpec%maxrange,&
-                           imax + jmax,&
-                           i_OrbSpec%maxrange + jmax)
-
-                      order2 = [0,-1,0]
-                      call perm_part1(iThree,perm1,perm2,order2,&
-                           iPairSpec%iexp1,j_OrbSpec%iexp,&
-                           iPairSpec%iexp2,jPairSpec%iexp2,&
-                           i_OrbSpec%iexp ,jPairSpec%iexp1)
-                      call add_K_Spec(iThree,minloc(order2,dim=1),&
-                           sum_TOT,max_2,max_1)
-
-                      order2 = [0,-1,0]
-                      call perm_part1(iThree,perm1,perm2,order2,&
-                           iPairSpec%iexp1,j_OrbSpec%iexp,&
-                           iPairSpec%iexp2,jPairSpec%iexp1,&
-                           i_OrbSpec%iexp ,jPairSpec%iexp2)
-                      call add_K_Spec(iThree,minloc(order2,dim=1),&
-                           sum_TOT,max_2,max_1)
-
-                      order2 = [0,0,-1]
-                      call perm_part1(iThree,perm1,perm2,order2,&
-                           iPairSpec%iexp1,jPairSpec%iexp1,&
-                           iPairSpec%iexp2,j_OrbSpec%iexp,&
-                           i_OrbSpec%iexp ,jPairSpec%iexp2)
-                      call add_K_Spec(iThree,minloc(order2,dim=1),&
-                           sum_TOT,max_2,max_1)
-
-                      order2 = [0,0,-1]
-                      call perm_part1(iThree,perm1,perm2,order2,&
-                           iPairSpec%iexp1,jPairSpec%iexp2,&
-                           iPairSpec%iexp2,j_OrbSpec%iexp,&
-                           i_OrbSpec%iexp ,jPairSpec%iexp1)
-                      call add_K_Spec(iThree,minloc(order2,dim=1),&
-                           sum_TOT,max_2,max_1)
-
-                   endif
-                 end associate
-              enddo
-           enddo
-
-        endif
-      end associate
-   enddo
-enddo
+!do j_prim=1,size(PairReduced)
+!   do i_prim=1,j_prim
+!      associate(&
+!           iPairSpec => PairReduced(i_prim),&
+!           jPairSpec => PairReduced(j_prim))
+!        if(iPairSpec%isUsed.and.jPairSpec%isUsed) then
+!
+!           do j_orb=1,size(OrbReduced)
+!              do i_orb=1,size(OrbReduced)
+!                 associate(&
+!                      i_OrbSpec => OrbReduced(i_orb),&
+!                      j_OrbSpec => OrbReduced(j_orb))
+!                   if(i_OrbSpec%isUsed.and.j_OrbSpec%isUsed) then
+!
+!                      sum_TOT = &
+!                           maxOmega_PairReduced(iPairSpec) + &
+!                           maxOmega_PairReduced(jPairSpec) + &
+!                           i_OrbSpec%maxrange + &
+!                           j_OrbSpec%maxrange
+!
+!                      max_2 = max(&
+!                           maxt_PairReduced(iPairSpec),&
+!                           maxt_PairReduced(jPairSpec))
+!
+!                      imax = maxuv_PairReduced(iPairSpec)
+!                      jmax = maxuv_PairReduced(jPairSpec)
+!
+!                      max_1 = max(&
+!                           imax + j_OrbSpec%maxrange,&
+!                           imax + jmax,&
+!                           i_OrbSpec%maxrange + jmax)
+!
+!                      order2 = [0,-1,0]
+!                      call perm_part1(iThree,perm1,perm2,order2,&
+!                           iPairSpec%iexp1,j_OrbSpec%iexp,&
+!                           iPairSpec%iexp2,jPairSpec%iexp2,&
+!                           i_OrbSpec%iexp ,jPairSpec%iexp1)
+!                      call add_K_Spec(iThree,minloc(order2,dim=1),&
+!                           sum_TOT,max_2,max_1)
+!
+!                      order2 = [0,-1,0]
+!                      call perm_part1(iThree,perm1,perm2,order2,&
+!                           iPairSpec%iexp1,j_OrbSpec%iexp,&
+!                           iPairSpec%iexp2,jPairSpec%iexp1,&
+!                           i_OrbSpec%iexp ,jPairSpec%iexp2)
+!                      call add_K_Spec(iThree,minloc(order2,dim=1),&
+!                           sum_TOT,max_2,max_1)
+!
+!                      order2 = [0,0,-1]
+!                      call perm_part1(iThree,perm1,perm2,order2,&
+!                           iPairSpec%iexp1,jPairSpec%iexp1,&
+!                           iPairSpec%iexp2,j_OrbSpec%iexp,&
+!                           i_OrbSpec%iexp ,jPairSpec%iexp2)
+!                      call add_K_Spec(iThree,minloc(order2,dim=1),&
+!                           sum_TOT,max_2,max_1)
+!
+!                      order2 = [0,0,-1]
+!                      call perm_part1(iThree,perm1,perm2,order2,&
+!                           iPairSpec%iexp1,jPairSpec%iexp2,&
+!                           iPairSpec%iexp2,j_OrbSpec%iexp,&
+!                           i_OrbSpec%iexp ,jPairSpec%iexp1)
+!                      call add_K_Spec(iThree,minloc(order2,dim=1),&
+!                           sum_TOT,max_2,max_1)
+!
+!                   endif
+!                 end associate
+!              enddo
+!           enddo
+!
+!        endif
+!      end associate
+!   enddo
+!enddo
 
 end subroutine init_K_ThreeInt
 
