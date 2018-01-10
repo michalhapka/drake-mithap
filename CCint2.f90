@@ -54,7 +54,7 @@ call init3_TwoInt(PairReduced)
 
 !call create_TwoInt
 
-!call print_TwoInt(LPRINT)
+call print_TwoInt(LPRINT)
 
 end subroutine create_CCint2
 
@@ -179,7 +179,7 @@ do j_prim=1,jPairSystem%n_prim
 
         case default
 
-           write(LOUT,'(a)') 'ERROR!!! Incorrect ABtype in CCint2_matS!'
+           write(LOUT,'(a)') 'ERROR!!! Incorrect ABtype in CCint2_matH!'
            stop
 
         end select
@@ -1177,7 +1177,7 @@ do j_prim=1,size(PairReduced)
            jexp = jPairSpec%iexp1
            kexp = iPairSpec%iexp2
            lexp = jPairSpec%iexp2
-           write(*,*) 'u:',iexp,kexp,jexp,lexp
+!           write(*,*) 'u:',iexp,kexp,jexp,lexp
            call order_exp(iTwo,ijorder,klorder,ijklorder,iexp,jexp,kexp,lexp)
 
            associate(Two => TwoInt(iTwo))
@@ -1205,7 +1205,6 @@ do j_prim=1,size(PairReduced)
                      associate(jPairSpecG => jPairSpec%PairReduced_G(jGenNum(jgen)),&
                                jPairGen => jPairSpec%PairReduced_G(jGenNum(jgen))%gen_type)
                              
-                     !write(*,*) 'iGen:',iPairSpecG%gen_type,'jGen',jPairSpecG%gen_type
                        range_ti = maxt_PairReduced(iPairSpecG,smallest_t)
                        range_tj = maxt_PairReduced(jPairSpecG,smallest_t)
                        if((range_ti<smallest_t).or.(range_tj<smallest_t)) then
@@ -1267,7 +1266,8 @@ do j_prim=1,size(PairReduced)
 
                           case default
                              write(LOUT,'(a)') 'Incorrect even pair & 
-                                  &  generator number in init3_TwoInt'
+                                  &  generator number in init3_TwoInt &
+                                  & (A part) '
                              stop
                           end select
 
@@ -1288,10 +1288,10 @@ do j_prim=1,size(PairReduced)
                           end select
                        endif  
 
-
-                       !write(*,*) 'iGen:',iPairSpecG%gen_type,'jGen',jPairSpecG%gen_type
-                       !write(*,*) 'Lambda   ', lam
-                       !write(*,*) 'add_to_uv', add_to_uv
+                      !  check A part
+                      ! write(*,*) 'iGen:',iPairSpecG%gen_type,'jGen',jPairSpecG%gen_type
+                      ! write(*,*) 'Lambda   ', lam
+                      ! write(*,*) 'add_to_uv', add_to_uv
 
                        if(ijklorder) then
 
@@ -1395,7 +1395,6 @@ do j_prim=1,size(PairReduced)
 !          end associate
 !
 !          B part
-           write(*,*) 'B-part'
            iexp = iPairSpec%iexp1
            jexp = jPairSpec%iexp2
            kexp = iPairSpec%iexp2
@@ -1415,8 +1414,8 @@ do j_prim=1,size(PairReduced)
                 stop
              endif
 
-            write(*,*) 'o:',iexp,kexp,jexp,lexp,ijklorder
-            write(*,*) ''
+           ! write(*,*) 'o:',iexp,kexp,jexp,lexp,ijklorder
+           ! write(*,*) ''
             ! loop over generators
              do igen=1,iPairSpec%n_gen
                 associate(iPairSpecG => iPairSpec%PairReduced_G(igen),&
@@ -1511,9 +1510,9 @@ do j_prim=1,size(PairReduced)
 
                        endif
                        ! check B part
-                       write(*,*) 'iGen:',iPairSpecG%gen_type,'jGen',jPairSpecG%gen_type
-                       write(*,*) 'Lambda   ', lam
-                       write(*,*) 'add_to_uv', add_to_uv
+                       !write(*,*) 'iGen:',iPairSpecG%gen_type,'jGen',jPairSpecG%gen_type
+                       !write(*,*) 'Lambda   ', lam
+                       !write(*,*) 'add_to_uv', add_to_uv
 
                        if(ijklorder) then
           
@@ -1625,23 +1624,30 @@ call mem_dealloc(range_uvi)
 
 call mem_dealloc(jGenNum)
 
-!do iTwo=1,size(TwoInt)
-!   associate(Two => TwoInt(iTwo))
-!     if(Two%isUsed) then
-!
-!        do t=smallest_t,Two%range_t-1
-!           pos_t = offset_t + t
-!
-!           do i=1,min(2,Two%range_t-t)
-!              Two%range_uv(:,pos_t) = &
-!                   max(Two%range_uv(:,pos_t),Two%range_uv(:,pos_t+i))
-!           enddo
-!
-!        enddo
-!
-!     endif
-!   end associate
-!enddo
+! adapt uv-range to Drake (11.33) 
+do iTwo=1,size(TwoInt)
+   associate(Two => TwoInt(iTwo))
+     if(Two%isUsed) then
+
+        do ilam=0,2
+           associate(TwoL => Two%ILambda(ilam))
+
+             do t=smallest_t,TwoL%range_t-1
+                pos_t = offset_t + t
+     
+                do i=1,min(2,TwoL%range_t-t)
+                   TwoL%range_uv(:,pos_t) = &
+                        max(TwoL%range_uv(:,pos_t),TwoL%range_uv(:,pos_t+i))
+                enddo
+     
+             enddo
+
+           end associate
+        enddo
+
+     endif
+   end associate
+enddo
 
 end subroutine init3_TwoInt
 
@@ -1776,24 +1782,49 @@ subroutine print_TwoInt(LPRINT)
 implicit none
 integer,intent(in) :: LPRINT
 integer :: iTwo
+integer :: ilam
 integer :: t,pos_t,u,v
 
- if(LPRINT>=10) then
+ !if(LPRINT>=10) then
+ if(LPRINT==6) then
  
     write(LOUT,'()')
     write(LOUT,'(5x,a)') '--- CC two-electron integrals ---'
-! 
-!    write(LOUT,'()')
-!    write(LOUT,'(1x,a,2x,4(2x,a),2x,4(5x,a,1x))') &
-!         'no.','i','j','k','l','ijalphaPL','ijalphaMI','klalphaPL','klalphaMI'
-!    do iTwo=1,size(TwoInt)
-!       associate(Two => TwoInt(iTwo))
-!         write(LOUT,'(1x,i3,a)',advance='no') iTwo,' :'
-!         if(Two%isUsed) then
-!            write(LOUT,'(4i3,1x,a,4f15.8)') &
-!                 Two%iexp,Two%jexp,Two%kexp,Two%lexp,&
-!                 merge('*',' ',Two%same_exp),&
-!                 Two%ijalphaPL,Two%ijalphaMI,Two%klalphaPL,Two%klalphaMI
+ 
+    write(LOUT,'()')
+    write(LOUT,'(1x,a,2x,4(2x,a),2x,4(5x,a,1x))') &
+         'no.','i','j','k','l','ijalphaPL','ijalphaMI','klalphaPL','klalphaMI'
+    do iTwo=1,size(TwoInt)
+       associate(Two => TwoInt(iTwo))
+         write(LOUT,'(1x,i3,a)',advance='no') iTwo,' :'
+         if(Two%isUsed) then
+            write(LOUT,'(4i3,1x,a,4f15.8)') &
+                 Two%iexp,Two%jexp,Two%kexp,Two%lexp,&
+                 merge('*',' ',Two%same_exp),&
+                 Two%ijalphaPL,Two%ijalphaMI,Two%klalphaPL,Two%klalphaMI
+            do ilam=0,2
+               associate(TwoL => Two%ILambda(ilam))
+                 do t=smallest_t,TwoL%range_t
+                    pos_t = offset_t + t
+                    write(LOUT,'(11x,a,i3,a,3x,a,i3,a,6x,a,2i4)') &
+                          'lam = ',ilam,',','t = ',t,',','max_u max_v = ',TwoL%range_uv(:,pos_t)
+!               if(LPRINT>=100) then
+!                  associate(&
+!                       r12      => Two%r12(pos_t), &
+!                       range_uv => Two%range_uv(:,pos_t))
+!                    do v=smallest_uv,range_uv(2)
+!                       do u=smallest_uv,range_uv(1)
+!                          write(LOUT,'(10x,2i3,a,es30.22)') u,v,' : ',&
+!                               r12%elms(offset_uv + u,offset_uv + v)
+!                       enddo
+!                    enddo
+!                  end associate
+!               endif
+                 enddo
+               end associate
+            enddo
+!
+! hapka: old_drake
 !            do t=smallest_t,Two%range_t
 !               pos_t = offset_t + t
 !               write(LOUT,'(11x,a,i3,a,6x,a,2i4)') &
@@ -1811,11 +1842,11 @@ integer :: t,pos_t,u,v
 !!                  end associate
 !!               endif
 !            enddo
-!         else
-!            write(LOUT,'(a)') 'NOT USED'
-!         endif
-!       end associate
-!    enddo
+         else
+            write(LOUT,'(a)') 'NOT USED'
+         endif
+       end associate
+    enddo
  
  endif
 
