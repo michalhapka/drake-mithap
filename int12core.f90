@@ -69,26 +69,109 @@ implicit none
 type(qd_real) :: Fpq
 integer,intent(in) :: p,q
 type(qd_real),intent(in) :: alpha,beta
-type(qd_real) :: regfac_p,regfac_q,ratio,tmp
+type(qd_real) :: regfac_p,regfac_q,regfac_pq,inv_p,ratio,tmp
 integer :: j
 
-if(p<0.or.q<0) then
+if(p>=0) then
+
+   if(q>=0) then
+
+      regfac_p = regfactorial(p,alpha + beta)
+      regfac_q = regfactorial(q,beta)
+      ratio = beta/(alpha + beta)
+
+      tmp = 1
+      do j=1,q
+         tmp = tmp + binomial(p+j,p)*ratio**j
+      enddo
+
+      Fpq = regfac_p*regfac_q*tmp
+
+   elseif(q==-1.and.alpha>beta) then
+
+      regfac_p = regfactorial(p,alpha)
+
+      ratio = beta/(alpha + beta)
+      tmp = -log(ratio)
+
+      ratio = alpha/(alpha + beta)
+      do j=1,p
+         tmp = tmp - ratio**j/j
+      enddo
+
+      Fpq = regfac_p*tmp
+
+   else
+
+      regfac_pq = regfactorial(p+q+1,alpha + beta)
+      inv_p = p + 1
+      inv_p = 1/inv_p
+      ratio = alpha/(alpha + beta)
+
+      tmp = confluent_2F1(1,p+q+2,p+2,ratio)
+
+      Fpq = regfac_pq*inv_p*tmp
+
+   endif
+
+else
    write(LOUT,'(a,i5,a,i5)') 'Case not covered in int2_F: ',p,', ',q
    stop
 endif
 
-regfac_p = regfactorial(p,alpha + beta)
-regfac_q = regfactorial(q,beta)
-ratio = beta/(alpha + beta)
-
-tmp = 1
-do j=1,q
-   tmp = tmp + binomial(p+j,p)*ratio**j
-enddo
-
-Fpq = regfac_p*regfac_q*tmp
-
 end function int2_F
+
+function confluent_2F1(a,b,c,x) result(val)
+implicit none
+integer,parameter :: CONFRAC_maxit  = 10000
+integer,parameter :: CONFRAC_thrmlt = 16
+type(qd_real) :: val
+integer,intent(in) :: a,b,c
+type(qd_real),intent(in) :: x
+type(qd_real) :: qd_eps,qd_tiny
+type(qd_real) :: qd_a,qd_b,qd_c,ratio
+type(qd_real) :: ai,bi,num,num_1,num_2,den,den_2,inv_den,prev,res
+integer :: i
+
+qd_eps  = CONFRAC_thrmlt*epsilon(val)
+qd_tiny = tiny(val)
+
+qd_a = a
+qd_b = b
+qd_c = c
+
+num_2 = 1
+num_1 = 1
+den_2 = 0
+
+prev = num_1
+
+do i=1,CONFRAC_maxit
+
+   ratio = ((qd_a + i)/(1 + i)) * ((qd_b + i)/(qd_c + i)) * x
+   ai = -ratio
+   bi = 1 + ratio
+
+   num = bi*num_1 + ai*num_2
+   den = bi + ai*den_2
+   inv_den = 1/den
+
+   res = num*inv_den
+   if(abs(prev-res)<max(res*qd_eps,qd_tiny)) exit
+   prev = res
+
+   num_2 = num_1*inv_den
+   num_1 = num*inv_den
+   den_2 = inv_den
+
+enddo
+if(i>CONFRAC_maxit) then
+   write(LOUT,'(a)') 'WARNING: too many iterations in continued_fraction!'
+endif
+
+val = 1 + (qd_a*(qd_b/qd_c) * x)/res
+
+end function confluent_2F1
 
 function regfactorial(n,alpha) result(regfac)
 implicit none
