@@ -12,6 +12,7 @@ public CCint2_matH,CCint2_matS,CCint2_vec,CCint2_val
 
 integer,parameter :: smallest_uv = -1
 integer,parameter :: offset_uv   = 1 - smallest_uv
+integer,parameter :: smallest_uv_vec(0:2) = [-1,0,1]
 
 integer,parameter :: smallest_t = -1
 integer,parameter :: offset_t   = 1 - smallest_t
@@ -26,12 +27,21 @@ integer,allocatable :: range_uv(:,:)
 type(r12Data),allocatable :: r12(:)
 end type ILambdaData
 
+type TwoInt_t_Data
+real(prec),allocatable :: elms(:,:)
+integer :: shift
+integer,allocatable :: level_range_uv(:,:)
+integer :: two_t
+integer :: lambda
+end type TwoInt_t_Data
+
 type TwoIntData
 logical :: isUsed
 integer :: iexp,jexp,kexp,lexp
 logical :: same_exp
 real(prec) :: ijalphaPL,ijalphaMI,klalphaPL,klalphaMI
 type(ILambdaData) :: ILambda(0:2)
+type(TwoInt_t_Data),allocatable :: t_val(:) 
 !integer :: range_t
 !integer,allocatable :: range_uv(:,:)
 !type(r12Data),allocatable :: r12(:)
@@ -52,7 +62,7 @@ call init1_TwoInt(Nexp,exponents)
 call init2_TwoInt(PairReduced)
 call init3_TwoInt(PairReduced)
 
-!call create_TwoInt
+call create_TwoInt
 
 call print_TwoInt(LPRINT)
 
@@ -1000,12 +1010,6 @@ do j_prim=1,size(PairReduced)
                            lam(1) = 0
                            lam(2) = 2
 
-                        !    Two%isUsed  = .true.
-                        !    Two%ILambda(0)%range_t = &
-                        !        max(Two%ILambda(0)%range_t,range_t)
-                        !    Two%ILambda(2)%range_t = &
-                        !        max(Two%ILambda(2)%range_t,range_t)
-                        !  
                         ! write(*,*) 'iGen:',iPairGen,'jGen',jPairGen
                         ! write(*,*) 'Lambda: (0, 2)'
                          case(1)
@@ -1013,42 +1017,22 @@ do j_prim=1,size(PairReduced)
                             call mem_alloc(lam,numlam)
                             lam(1) = 0
 
-                        !    Two%isUsed  = .true.
-                        !    Two%ILambda(0)%range_t = &
-                        !        max(Two%ILambda(0)%range_t,range_t)
-                        ! write(*,*) 'iGen:',iPairGen,'jGen',jPairGen
-                        ! write(*,*) 'Lambda: (0)'
                          case(2)
                             numlam = 1
                             call mem_alloc(lam,numlam)
                             lam(1) = 1
 
-                        !    Two%isUsed  = .true.
-                        !    Two%ILambda(1)%range_t = &
-                        !        max(Two%ILambda(1)%range_t,range_t)
-                        !    write(*,*) 'iGen:',iPairGen,'jGen',jPairGen
-                        !    write(*,*) 'Lambda: (1)'
                          case(5)
                             numlam = 1
                             call mem_alloc(lam,numlam)
                             lam(1) = 2
 
-                        !    Two%isUsed  = .true.
-                        !    Two%ILambda(2)%range_t = &
-                        !        max(Two%ILambda(2)%range_t,range_t)
-                        !    write(*,*) 'iGen:',iPairGen,'jGen',jPairGen
-                        !    write(*,*) 'Lambda: (2)'
                          end select
                       else 
                          numlam = 1
                          call mem_alloc(lam,numlam)
                          lam(1) = 1
 
-                        ! Two%isUsed  = .true.
-                        ! Two%ILambda(1)%range_t = &
-                        !     max(Two%ILambda(1)%range_t,range_t)
-                        ! write(*,*) 'iGen:',iPairGen,'jGen',jPairGen
-                        ! write(*,*) 'Lambda: (1)'
                       endif
 ! hapka: old_drake
 !                range_t = range_ti + range_tj
@@ -1655,11 +1639,495 @@ subroutine create_Twoint
 implicit none
 integer :: iTwo
 integer :: t,pos_t,u,v
+integer :: ilam,maxt
+integer :: max_lam
+integer :: ctr
 
- !do iTwo=1,size(TwoInt)
- !   associate(Two => TwoInt(iTwo))
- !     if(Two%isUsed) then
+ do iTwo=1,size(TwoInt)
+    associate(Two => TwoInt(iTwo))
+      if(Two%isUsed) then
+         ! allocate r12%elms
+         do ilam=0,2 
+            associate(TwoL => Two%ILambda(ilam))
+              allocate(TwoL%r12(TwoL%range_t-smallest_t+1))
+
+              do t=smallest_t,TwoL%range_t
+                 pos_t = offset_t + t
+                 associate(&
+                      r12      => TwoL%r12(pos_t), &
+                      range_uv => TwoL%range_uv(:,pos_t))
+
+                      call mem_alloc(r12%elms,&
+                           range_uv(1)-smallest_uv_vec(ilam)+1,&
+                           range_uv(2)-smallest_uv_vec(ilam)+1)
+
+                 end associate
+              enddo
+
+            end associate
+         enddo 
+
+!        write(LOUT,'(4i3)') Two%iexp,Two%jexp,Two%kexp,Two%lexp
+         maxt = maxval(Two%ILambda(:)%range_t)
+         ! loop over t values 
+         do t=smallest_t,maxt
+            pos_t = offset_t + t 
+            max_lam = 0
+            do ilam=0,2
+               if(pos_t.gt.(Two%ILambda(ilam)%range_t+offset_t)) cycle
+               max_lam = max(ilam,max_lam)
+            enddo
+
+            call create_tval(Two,t,pos_t,max_lam)
+            call create_Izero(Two,max_lam)
+
+! check I0 manually
+! ERROR!!! CHECK LATER -- DIFFERENCE WRT MATHEMATICA!!!!!!!!
+!            write(LOUT,'(5x,2f15.8)') Two%ijalphaPL,Two%klalphaPL
+!            do ctr=1,size(Two%t_val)
+!                   associate(&
+!                     tval     => Two%t_val(ctr),&
+!                     two_t    => Two%t_val(ctr)%two_t,&
+!                     range_uv => Two%t_val(ctr)%level_range_uv(1,:))
+!                     do v=smallest_uv,range_uv(2)
+!                        do u=smallest_uv,range_uv(1)
+!                           write(LOUT,'(10x,3i3,a,es30.22)') two_t,u,v,' : ',&
+!                                tval%elms(offset_uv + u,offset_uv + v)
+!                        enddo
+!                     enddo
+!
+!                    end associate
+!            enddo
+            if(max_lam/=0) then
+               call create_Ilambda(Two,max_lam)
+            endif  
+! check Ilam manually
+! ERROR!!! CHECK LATER -- DIFFERENCE WRT MATHEMATICA!!!!!!!!
+!            write(LOUT,'(5x,2f15.8)') Two%ijalphaPL,Two%klalphaPL
+!            do ctr=1,size(Two%t_val)
+!                   associate(&
+!                     tval     => Two%t_val(ctr),&
+!                     lam      => Two%t_val(ctr)%lambda,&
+!                     two_t    => Two%t_val(ctr)%two_t,&
+!                     range_uv => Two%t_val(ctr)%level_range_uv(max_lam+1,:))
+!                           write(LOUT,'(2i3)') range_uv(2), range_uv(1)
+!                     do v=smallest_uv_vec(ctr-1),range_uv(2)
+!                        do u=smallest_uv_vec(ctr-1),range_uv(1)
+!                           write(LOUT,'(10x,4i3,a,es30.22)') lam,two_t,u,v,' : ',&
+!                                tval%elms(offset_uv + u,offset_uv + v)
+!                        enddo
+!                     enddo
+!
+!                    end associate
+!            enddo
+
+            call rewrite_Ilambda(Two,t,pos_t,max_lam)
+            call free_tval(Two,max_lam)
+         enddo
+
+      endif
+    end associate
+ enddo
+
+end subroutine create_Twoint
+
+subroutine create_tval(Two,t,pos_t,max_lam)
+implicit none
+type(TwoIntData) :: Two
+integer,intent(in) :: t,pos_t
+integer,intent(in) :: max_lam
+integer,allocatable :: range_tmp(:,:)
+integer :: range_uv_alloc(2)
+integer :: ilam,ival,ilev,ilev2
+
+
+allocate(Two%t_val(max_lam+1))
+allocate(range_tmp(2,3))
+
+     do ival=1,3
+        if(pos_t.gt.(Two%ILambda(ival-1)%range_t+offset_t)) then 
+           range_tmp(:,ival) = smallest_uv - 1
+        else
+           range_tmp(:,ival) = Two%ILambda(ival-1)%range_uv(:,pos_t)
+        endif
+
+     enddo
+
+!get level_range_uv
+do ilam=max_lam,0,-1
+
+   call mem_alloc(Two%t_val(ilam+1)%level_range_uv,max_lam+1,2)
+   associate(tval => Two%t_val(ilam+1))
+
+     select case(ilam)
+     case(0)
+        do ilev=0,max_lam
+!           select case(ilev)
+!           case(0)
+!              ! for t, level=0: max_uv(I0,I1+1,I2)
+!              tval%level_range_uv(1,:) = & 
+!                   max(range_tmp(:,1),range_tmp(:,2)+1,range_tmp(:,3))
+!           case(1)
+!              ! for t, level=1: max_uv(I0,I1+1,I2)
+!              tval%level_range_uv(2,:) = & 
+!                   max(range_tmp(:,1),range_tmp(:,2)+1,range_tmp(:,3))
+! better way:
+           if(ilev==max_lam) then
+              ! for t, level=last: uv(I0)
+              tval%level_range_uv(max_lam+1,:) = range_tmp(:,1)
+           else
+              ! for t, other levels: max_uv(I0,I1+1,I2)
+              tval%level_range_uv(ilev+1,:) = & 
+                   max(range_tmp(:,1),range_tmp(:,2)+1,range_tmp(:,3))
+           endif
+        enddo
+        !write(*,*) 'Lam=0, level=0',tval%level_range_uv(1,:)
+        !write(*,*) 'Lam=0, level=1',tval%level_range_uv(2,:)
+        !write(*,*) 'Lam=0, level=2',tval%level_range_uv(3,:)
+        !write(*,*) ''
+          
+     case(1)
+        do ilev=0,max_lam
+        !   select case(ilev)
+        !   case(0)
+        !      ! for t+2, level=0: max_uv(I1-1,I2)
+        !      tval%level_range_uv(1,:) = &
+        !           max(range_tmp(:,2)-1,range_tmp(:,3))
+        !   case(1)
+        !      ! for t+2, level=1: uv(I1-1)
+        !      tval%level_range_uv(2,:) = range_tmp(:,2)-1
+        !   case(2)
+        !      ! for t+2, level=2: uv(I1)
+        !      tval%level_range_uv(3,:) = range_tmp(:,2)
+        !   case default
+        !      write(LOUT,'(a)') 'ERROR!!! Incorrect number of &
+        !                 & levels for t=c+2 in level_range_uv!'
+        !      stop
+        !   end select   
+! better way?
+           if(ilev==max_lam) then
+              ! for t+2, level=last: uv(I1)
+              tval%level_range_uv(max_lam+1,:) = range_tmp(:,2)
+           elseif(ilev==0) then
+              ! for t+2, other levels: max_uv(I1-1,I2)
+              tval%level_range_uv(1,:) = &
+                   max(range_tmp(:,2)-1,range_tmp(:,3))
+           else
+              ! for t+2, other levels: max_uv(I1-1,I2)
+              tval%level_range_uv(2,:) = &
+                   range_tmp(:,2)-1
+           endif
+        enddo
+        !write(*,*) 'Lam=1, level=0',tval%level_range_uv(1,:)
+        !write(*,*) 'Lam=1, level=1',tval%level_range_uv(2,:)
+        !write(*,*) 'Lam=1, level=2',tval%level_range_uv(3,:)
+        !write(*,*) ''
+
+     case(2)
+        do ilev=0,max_lam
+        !   select case(ilev)
+        !   case(0)
+        !      ! for t+4, level=0: max_uv(I2-2)
+        !      tval%level_range_uv(1,:) = range_tmp(:,3)-2
+        !   case(1)
+        !      ! for t+4, level=1: max_uv(I2-1)
+        !      tval%level_range_uv(2,:) = range_tmp(:,3)-1
+        !   case(2)
+        !      ! for t+4, level=2: max_uv(I2)
+        !      tval%level_range_uv(3,:) = range_tmp(:,3)
+        !   case default
+        !      write(LOUT,'(a)') 'ERROR!!! Incorrect number of &
+        !                 & levels for t=c+4 in level_range_uv!'
+        !      stop
+        !   end select
+! better way
+           if(ilev==max_lam) then
+              ! for t+4, level=last: max_uv(I2)
+              tval%level_range_uv(3,:) = range_tmp(:,3)
+           else
+              ! for t+4, level=0: max_uv(I2-2)
+              tval%level_range_uv(ilev+1,:) = &
+                   range_tmp(:,3)-2+ilev
+           endif
+
+        enddo
+        !write(*,*) 'Lam=2, level=0',tval%level_range_uv(1,:)
+        !write(*,*) 'Lam=2, level=1',tval%level_range_uv(2,:)
+        !write(*,*) 'Lam=2, level=2',tval%level_range_uv(3,:)
+        !write(*,*) ''
+
+     case default
+        write(LOUT,'(a)') 'ERROR!!! Wrong max lambda in &
+                       & create_TwoInt (CCint2)!'
+        stop
+     end select
+
+   end associate
+enddo
+
+! allocate tval's
+do ilam=0,max_lam
+   associate(tval => Two%t_val(ilam+1))
+
+     tval%shift = 0 ! not necessary?
+     tval%two_t = t + 2*ilam
+     tval%lambda = 0
+     select case(ilam)
+     case(0)
+        ! allocate range max(I0,I1+1,I2)
+        call mem_alloc(tval%elms, &
+             tval%level_range_uv(1,1)-smallest_uv+1,&
+             tval%level_range_uv(1,2)-smallest_uv+1)
+     case(1)
+        ! allocate range max(I1,I2)
+        range_uv_alloc = max(range_tmp(:,2),range_tmp(:,3))
+        call mem_alloc(tval%elms, &
+             range_uv_alloc(1)-smallest_uv+1,&
+             range_uv_alloc(2)-smallest_uv+1)
+     case(2)
+        ! allocate range (-1:I2)
+        call mem_alloc(tval%elms, &
+             tval%level_range_uv(3,1)-smallest_uv+1,&
+             tval%level_range_uv(3,2)-smallest_uv+1)
+     case default 
+        write(LOUT,'(a)') 'ERROR!!! Incorrect &
+                    & tval allocation in CCint2!'
+        stop
+     end select
+   end associate
+enddo
+
+deallocate(range_tmp)
+
+end subroutine create_tval
+
+subroutine free_tval(Two,max_lam)
+implicit none
+type(TwoIntData) :: Two
+integer :: max_lam, j
+
+if(Two%isUsed) then
+
+   do j=1,max_lam+1!size(Two%t_val)
+      call mem_dealloc(Two%t_val(j)%level_range_uv)
+      call mem_dealloc(Two%t_val(j)%elms)
+   enddo
+
+    deallocate(Two%t_val)
+endif
+
+end subroutine free_tval
+
+subroutine create_Izero(Two,max_lam)
+implicit none
+
+type(TwoIntData) :: Two
+integer :: ival,max_lam
+integer :: i,j,u,v
+
+do ival=1,max_lam+1
+   associate(&
+        tval     => Two%t_val(ival), &
+        two_t    => Two%t_val(ival)%two_t,& 
+        range_uv => Two%t_val(ival)%level_range_uv(1,:) )
+
+        if(Two%same_exp) then
+ 
+           do v=smallest_uv,range_uv(2)
+              do u=smallest_uv,min(v,range_uv(1))
+                 tval%elms(offset_uv + u,offset_uv + v) = &
+                      int2_slater(u,v,two_t,Two%ijalphaPL,Two%klalphaPL)
+              enddo
+           enddo
+           do v=smallest_uv,minval(range_uv)
+              do u=v+1,minval(range_uv)
+                 tval%elms(offset_uv + u,offset_uv + v) = &
+                      tval%elms(offset_uv + v,offset_uv + u)
+              enddo
+           enddo
+           if(range_uv(1)>range_uv(2)) then
+              do v=smallest_uv,range_uv(2)
+                 do u=range_uv(2)+1,range_uv(1)
+                    tval%elms(offset_uv + u,offset_uv + v) = &
+                         int2_slater(u,v,two_t,Two%ijalphaPL,Two%klalphaPL)
+                 enddo
+              enddo
+           endif
+
+        else
+
+           do v=smallest_uv,range_uv(2)
+              do u=smallest_uv,range_uv(1)
+                 tval%elms(offset_uv + u,offset_uv + v) = &
+                      int2_slater(u,v,two_t,Two%ijalphaPL,Two%klalphaPL)
+            !write(*,*) Two%ijalphaPL,Two%klalphaPL
+            !write(*,*) u,v,two_t, int2_slater(u,v,two_t,Two%ijalphaPL,Two%klalphaPL)
+            !write(*,*) tval%elms(offset_uv + u,offset_uv + v) 
+              enddo
+           enddo
+
+        endif
+
+   end associate
+enddo
+!
+! hapka: old_drake
+!        do t=smallest_t,Two%range_t
+ !           pos_t = offset_t + t
+ !           associate(&
+ !                r12      => Two%r12(pos_t), &
+ !                range_uv => Two%range_uv(:,pos_t))
  !
+ !             call mem_alloc(r12%elms,&
+ !                  range_uv(1)-smallest_uv+1,&
+ !                  range_uv(2)-smallest_uv+1)
+ !
+ !             if(Two%same_exp) then
+ !
+ !                do v=smallest_uv,range_uv(2)
+ !                   do u=smallest_uv,min(v,range_uv(1))
+ !                      r12%elms(offset_uv + u,offset_uv + v) = &
+ !                           int2_slater(u,v,t,Two%ijalphaPL,Two%klalphaPL)
+ !                   enddo
+ !                enddo
+ !                do v=smallest_uv,minval(range_uv)
+ !                   do u=v+1,minval(range_uv)
+ !                      r12%elms(offset_uv + u,offset_uv + v) = &
+ !                           r12%elms(offset_uv + v,offset_uv + u)
+ !                   enddo
+ !                enddo
+ !                if(range_uv(1)>range_uv(2)) then
+ !                   do v=smallest_uv,range_uv(2)
+ !                      do u=range_uv(2)+1,range_uv(1)
+ !                         r12%elms(offset_uv + u,offset_uv + v) = &
+ !                              int2_slater(u,v,t,Two%ijalphaPL,Two%klalphaPL)
+ !                      enddo
+ !                   enddo
+ !                endif
+ !
+ !             else
+ !
+ !                do v=smallest_uv,range_uv(2)
+ !                   do u=smallest_uv,range_uv(1)
+ !                      r12%elms(offset_uv + u,offset_uv + v) = &
+ !                           int2_slater(u,v,t,Two%ijalphaPL,Two%klalphaPL)
+ !                   enddo
+ !                enddo
+ !
+ !             endif
+ !
+ !           end associate
+ !        enddo
+
+end subroutine create_Izero
+
+subroutine create_Ilambda(Two,max_lam)
+implicit none
+
+type(TwoIntData) :: Two
+integer :: max_lam
+real(prec) :: lam_tmp,c_tmp,prefac
+integer :: i,j
+integer :: ival,jval
+integer :: range_uv(2)
+integer :: span,start_uv,pos
+
+! loop over recursion
+do ival=1,max_lam
+
+   ! create I_1
+   range_uv(1) = Two%t_val(max_lam+2-ival)%level_range_uv(ival+1,1)
+   range_uv(2) = Two%t_val(max_lam+2-ival)%level_range_uv(ival+1,2)
+   do j=range_uv(2),smallest_uv_vec(1),-1
+      do i=range_uv(1),smallest_uv_vec(1),-1
+         Two%t_val(max_lam+2-ival)%elms(offset_uv+i,offset_uv+j)= 0.5_prec* ( &
+         Two%t_val(max_lam+1-ival)%elms(offset_uv+i+1,offset_uv+j-1) + &
+         Two%t_val(max_lam+1-ival)%elms(offset_uv+i-1,offset_uv+j+1) - &
+         Two%t_val(max_lam+2-ival)%elms(offset_uv+i-1,offset_uv+j-1) )
+      enddo
+   enddo
+
+   Two%t_val(max_lam+2-ival)%two_t = Two%t_val(max_lam+2-ival)%two_t - 2
+   Two%t_val(max_lam+2-ival)%lambda = 1
+
+   if(ival.eq.1) cycle
+
+   ! create I_n
+   pos = 0
+   do jval=1,ival-1
+
+   lam_tmp = Two%t_val(max_lam+2-ival+jval)%lambda
+   c_tmp = Two%t_val(max_lam+2-ival+jval)%two_t - 2._prec 
+   prefac = (2._prec*lam_tmp + 1._prec) / (c_tmp + 2._prec)
+
+   start_uv = jval
+   range_uv(1) = Two%t_val(max_lam+2-ival+jval)%level_range_uv(ival+1,1) 
+   range_uv(2) = Two%t_val(max_lam+2-ival+jval)%level_range_uv(ival+1,2) 
+   do j=range_uv(2),start_uv,-1 
+      do i=range_uv(1),start_uv,-1 
+
+           Two%t_val(max_lam+2-ival+jval)%elms(offset_uv+i,offset_uv+j) = prefac* ( &
+           Two%t_val(max_lam+2-ival+jval)%elms(offset_uv+i+pos-1,offset_uv+j+pos-1)) + &
+           Two%t_val(max_lam-ival+jval)%elms(offset_uv+i+pos,offset_uv+j+pos) 
+
+      enddo
+   enddo
+
+   pos = pos - 1
+   Two%t_val(max_lam+2-ival+jval)%lambda = Two%t_val(max_lam+2-ival+jval)%lambda + 1
+   Two%t_val(max_lam+2-ival+jval)%two_t = Two%t_val(max_lam+2-ival+jval)%two_t - 2
+
+   enddo 
+
+enddo
+
+end subroutine create_Ilambda
+
+subroutine rewrite_Ilambda(Two,t,pos_t,max_lam)
+implicit none
+
+type(TwoIntData) :: Two
+integer :: t,pos_t,max_lam
+integer :: u,v
+integer :: ilam
+
+do ilam=0,2
+   associate(&
+          TwoL     => Two%ILambda(ilam),&
+          tval     => Two%t_val(ilam+1),&
+          lam      => Two%t_val(ilam+1)%lambda,&
+          two_t    => Two%t_val(ilam+1)%two_t,& 
+         range_uv => Two%t_val(ilam+1)%level_range_uv(max_lam+1,:))
+
+     if(pos_t.gt.(TwoL%range_t+offset_t)) cycle
+     associate(&
+          r12      => TwoL%r12(pos_t), &
+          range_uv2 => TwoL%range_uv(:,pos_t) )
+
+       !write(LOUT,'(4i3)') range_uv(2), range_uv(1), ilam, lam
+       !write(LOUT,'(2i3)') range_uv2(2), range_uv2(1)
+       do v=smallest_uv_vec(ilam),range_uv2(2)
+          do u=smallest_uv_vec(ilam),range_uv2(1)
+             r12%elms(offset_uv-ilam+u,offset_uv-ilam+v) = & 
+                 tval%elms(offset_uv + u,offset_uv + v)
+          enddo
+       enddo
+     end associate     
+   end associate
+enddo
+
+end subroutine rewrite_Ilambda
+
+! hapka: old_drake
+!subroutine create_Twoint
+!implicit none
+!integer :: iTwo
+!integer :: t,pos_t,u,v
+!
+! do iTwo=1,size(TwoInt)
+!    associate(Two => TwoInt(iTwo))
+!      if(Two%isUsed) then
+ 
  !        allocate(Two%r12(Two%range_t-smallest_t+1))
  !
  !        do t=smallest_t,Two%range_t
@@ -1709,11 +2177,12 @@ integer :: t,pos_t,u,v
  !           end associate
  !        enddo
  !
- !     endif
- !   end associate
- !enddo
+!      endif
+!    end associate
+! enddo
+!
+!end subroutine create_Twoint
 
-end subroutine create_Twoint
 
 subroutine free_TwoInt
 implicit none
@@ -1721,21 +2190,21 @@ integer :: iTwo
 integer :: ilam
 integer :: t
 
-!do iTwo=1,size(TwoInt)
-!   associate(Two => TwoInt(iTwo))
-!     if(Two%isUsed) then
-!        do ilam=0,2
-!           associate(TwoL => Two%ILambda(ilam))
-!             do t=smallest_t,TwoL%range_t
-!                call mem_dealloc(TwoL%r12(offset_t + t)%elms)
-!             enddo
-!
-!             deallocate(TwoL%r12)
-!           end associate
-!        enddo  
-!     endif
-!   end associate
-!enddo
+do iTwo=1,size(TwoInt)
+   associate(Two => TwoInt(iTwo))
+     if(Two%isUsed) then
+        do ilam=0,2
+           associate(TwoL => Two%ILambda(ilam))
+             do t=smallest_t,TwoL%range_t
+                call mem_dealloc(TwoL%r12(offset_t + t)%elms)
+             enddo
+
+             deallocate(TwoL%r12)
+           end associate
+        enddo  
+     endif
+   end associate
+enddo
 
 do iTwo=1,size(TwoInt)
    associate(Two => TwoInt(iTwo))
@@ -1784,6 +2253,7 @@ integer,intent(in) :: LPRINT
 integer :: iTwo
 integer :: ilam
 integer :: t,pos_t,u,v
+integer :: ctr
 
  !if(LPRINT>=10) then
  if(LPRINT==6) then
@@ -1808,18 +2278,20 @@ integer :: t,pos_t,u,v
                     pos_t = offset_t + t
                     write(LOUT,'(11x,a,i3,a,3x,a,i3,a,6x,a,2i4)') &
                           'lam = ',ilam,',','t = ',t,',','max_u max_v = ',TwoL%range_uv(:,pos_t)
-!               if(LPRINT>=100) then
-!                  associate(&
-!                       r12      => Two%r12(pos_t), &
-!                       range_uv => Two%range_uv(:,pos_t))
-!                    do v=smallest_uv,range_uv(2)
-!                       do u=smallest_uv,range_uv(1)
-!                          write(LOUT,'(10x,2i3,a,es30.22)') u,v,' : ',&
-!                               r12%elms(offset_uv + u,offset_uv + v)
-!                       enddo
-!                    enddo
-!                  end associate
-!               endif
+! check ILambda
+!              if(LPRINT>=100) then
+               if(LPRINT>=6) then
+                  associate(&
+                       r12      => TwoL%r12(pos_t), &
+                       range_uv => TwoL%range_uv(:,pos_t))
+                    do v=smallest_uv_vec(ilam),range_uv(2)
+                       do u=smallest_uv_vec(ilam),range_uv(1)
+                          write(LOUT,'(10x,2i3,a,es40.32)') u,v,' : ',&
+                               r12%elms(offset_uv-ilam+u,offset_uv-ilam+v)
+                       enddo
+                    enddo
+                  end associate
+               endif
                  enddo
                end associate
             enddo
