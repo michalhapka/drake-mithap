@@ -339,29 +339,27 @@ private
 !      write(*,*) i,i,matS(3)%matOne(i,i)
 !enddo
 
+! <P^e|P^e> (T)
+   call CCint2_matS('A',0,nbas(3),nbas(3),TMP, &
+               System%PairSystem_G(3)%gen_type,&
+               System%PairSystem_G(3)%gen_type,&
+               System%PairSystem_G(3)%PairSystem(1,1),&
+               System%PairSystem_G(3)%PairSystem(1,1))
 
-!! <P^e|P^e> (T)
-!   call CCint2_matS('A',0,nbas(3),nbas(3),TMP, &
-!               System%PairSystem_G(3)%gen_type,&
-!               System%PairSystem_G(3)%gen_type,&
-!               System%PairSystem_G(3)%PairSystem(1,1),&
-!               System%PairSystem_G(3)%PairSystem(1,1))
-!
-!   call paste_matrix(nbas(3),nbas(3),TMP,0,0,matS(5)%matOne,'N')
-!
-!   call CCint2_matS('B',0,nbas(3),nbas(3),TMP, &
-!               System%PairSystem_G(3)%gen_type,&
-!               System%PairSystem_G(3)%gen_type,&
-!               System%PairSystem_G(3)%PairSystem(1,1),&
-!               System%PairSystem_G(3)%PairSystem(1,1))
-!!   ! here + / -?
-!   call add_matrix(nbas(3),nbas(3),TMP,0,0,matS(5)%matOne,'P',N')
-!
-!!do i=1,nbas(3)
-!!      write(*,*) i,i,matS(5)%matOne(i,i)
-!!enddo
-!
-!
+   call paste_matrix(nbas(3),nbas(3),TMP,0,0,matS(5)%matOne,'N')
+
+   call CCint2_matS('B',0,nbas(3),nbas(3),TMP, &
+               System%PairSystem_G(3)%gen_type,&
+               System%PairSystem_G(3)%gen_type,&
+               System%PairSystem_G(3)%PairSystem(1,1),&
+               System%PairSystem_G(3)%PairSystem(1,1))
+!   ! here + / -?
+   call add_matrix(nbas(3),nbas(3),TMP,0,0,matS(5)%matOne,'P','N')
+
+!do i=1,nbas(3)
+!      write(*,*) i,i,matS(5)%matOne(i,i)
+!enddo
+
 ! <D^e(1)|D^e(1)>
    call CCint2_matS('A',0,nbas(4),nbas(4),TMP, &
                System%PairSystem_G(4)%gen_type,&
