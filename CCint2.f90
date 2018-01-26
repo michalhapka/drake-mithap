@@ -13,6 +13,7 @@ public CCint2_matH,CCint2_matS,CCint2_vec,CCint2_val
 integer,parameter :: smallest_uv = -1
 integer,parameter :: offset_uv   = 1 - smallest_uv
 integer,parameter :: smallest_uv_vec(0:2) = [-1,0,1]
+integer,parameter :: offset_uv_vec(0:2) = [1,1,1] - smallest_uv_vec
 
 integer,parameter :: smallest_t = -1
 integer,parameter :: offset_t   = 1 - smallest_t
@@ -42,12 +43,16 @@ logical :: same_exp
 real(prec) :: ijalphaPL,ijalphaMI,klalphaPL,klalphaMI
 type(ILambdaData) :: ILambda(0:2)
 type(TwoInt_t_Data),allocatable :: t_val(:) 
-!integer :: range_t
-!integer,allocatable :: range_uv(:,:)
-!type(r12Data),allocatable :: r12(:)
 end type TwoIntData
 
 type(TwoIntData),allocatable :: TwoInt(:)
+
+type InfoGenPair
+logical :: isUsed
+integer :: add_to_1
+integer :: add_to_2
+real(prec) :: coeff
+end type InfoGenPair
 
 contains
 
@@ -310,17 +315,23 @@ contains
 
 end subroutine CCint2_matH
 
-subroutine CCint2_matS(ABtype,add_t,matS,iPairSystem,jPairSystem)
+subroutine CCint2_matS(ABtype,add_t,n1,n2,matS,iGen,jGen,iPairSystem,jPairSystem)
 implicit none
 character(1),intent(in) :: ABtype
 integer,intent(in) :: add_t
-real(prec) :: matS(:,:)
+integer,intent(in) :: n1,n2
+integer,intent(in) :: iGen,jGen
+!real(prec) :: matS(:,:)
+real(prec) :: matS(n1,n2)
 type(PairSystemData),intent(in) :: iPairSystem,jPairSystem
 integer :: i_prim,j_prim
 integer :: iexp,jexp,kexp,lexp,iTwo
 logical :: ijorder,klorder,ijklorder
 integer :: ui,vi,ti,ipos,iflag
 integer :: uj,vj,tj,jpos,jflag
+integer :: ilam
+type(InfoGenPair) :: info(0:2)
+integer ::i 
 
 if(add_t<smallest_t) then
    write(LOUT,'(a)') 'ERROR!!! &
@@ -328,6 +339,9 @@ if(add_t<smallest_t) then
    stop
 endif
 
+call get_genpair_info(iGen,jGen,ABtype,info)
+
+matS = 0
 do j_prim=1,jPairSystem%n_prim
    do i_prim=1,iPairSystem%n_prim
       associate(&
@@ -358,44 +372,87 @@ do j_prim=1,jPairSystem%n_prim
 
              if(ijklorder) then
 
-                jpos  = jPairSpec%offset
-                jflag = -1
-                do while(increment_PairSpec(uj,vj,tj,jflag,jPairSpec))
-                   jpos = jpos + 1
+                do ilam=0,2
+                   if(info(ilam)%isUsed) then
+                      associate(&
+                           offset_uv => offset_uv_vec(ilam),&
+                           coeff    => info(ilam)%coeff,&
+                           add_to_1 => info(ilam)%add_to_1,&
+                           add_to_2 => info(ilam)%add_to_2,&
+                           TwoL => Two%ILambda(ilam))
 
-                   ipos  = iPairSpec%offset
-                   iflag = -1
-                   do while(increment_PairSpec(ui,vi,ti,iflag,iPairSpec))
-                      ipos = ipos + 1
+                        !write(*,*) 'A-even',ilam
+                        !write(*,*) iGen,jGen,coeff
+                        !write(*,*) add_to_1,add_to_2
+                        jpos  = jPairSpec%offset
+                        jflag = -1
+                        do while(increment_PairSpec(uj,vj,tj,jflag,jPairSpec))
+                           jpos = jpos + 1
 
-                   !   matS(ipos,jpos) = Two%r12(&
-                   !        offset_t  + ti + tj + add_t)%elms( &
-                   !        offset_uv + ui + uj, &
-                   !        offset_uv + vi + vj)
+                           ipos  = iPairSpec%offset
+                           iflag = -1
+                           do while(increment_PairSpec(ui,vi,ti,iflag,iPairSpec))
+                              ipos = ipos + 1
+                               
+                              matS(ipos,jpos) = matS(ipos,jpos) + & 
+                                   coeff * TwoL%r12(&
+                                   offset_t  + ti + tj + add_t)%elms( &
+                                   offset_uv + ui + uj + add_to_1, &
+                                   offset_uv + vi + vj + add_to_2)
 
-                   enddo
+                           !   matS(ipos,jpos) = Two%r12(&
+                           !        offset_t  + ti + tj + add_t)%elms( &
+                           !        offset_uv + ui + uj, &
+                           !        offset_uv + vi + vj)
 
+                           enddo
+
+                        enddo
+                        end associate
+                   endif
                 enddo
 
              else
 
-                jpos  = jPairSpec%offset
-                jflag = -1
-                do while(increment_PairSpec(uj,vj,tj,jflag,jPairSpec))
-                   jpos = jpos + 1
+                do ilam=0,2
+                   if(info(ilam)%isUsed) then
+                      associate(&
+                           offset_uv => offset_uv_vec(ilam),&
+                           coeff    => info(ilam)%coeff,&
+                           add_to_1 => info(ilam)%add_to_1,&
+                           add_to_2 => info(ilam)%add_to_2,&
+                           TwoL => Two%ILambda(ilam))
+                        
+                        !write(*,*) 'A-odd',ilam
+                        !write(*,*) iGen,jGen,coeff
+                        !write(*,*) add_to_1,add_to_2
 
-                   ipos  = iPairSpec%offset
-                   iflag = -1
-                   do while(increment_PairSpec(ui,vi,ti,iflag,iPairSpec))
-                      ipos = ipos + 1
+                        jpos  = jPairSpec%offset
+                        jflag = -1
+                        do while(increment_PairSpec(uj,vj,tj,jflag,jPairSpec))
+                           jpos = jpos + 1
+        
+                           ipos  = iPairSpec%offset
+                           iflag = -1
+                           do while(increment_PairSpec(ui,vi,ti,iflag,iPairSpec))
+                              ipos = ipos + 1
 
-                   !   matS(ipos,jpos) = Two%r12(&
-                   !        offset_t  + ti + tj + add_t)%elms( &
-                   !        offset_uv + vi + vj, &
-                   !        offset_uv + ui + uj)
+                              matS(ipos,jpos) = matS(ipos,jpos) + &
+                                   coeff * TwoL%r12(&
+                                   offset_t  + ti + tj + add_t)%elms( &
+                                   offset_uv + vi + vj + add_to_2, &
+                                   offset_uv + ui + uj + add_to_1)
 
-                   enddo
-
+                           !   matS(ipos,jpos) = Two%r12(&
+                           !        offset_t  + ti + tj + add_t)%elms( &
+                           !        offset_uv + vi + vj, &
+                           !        offset_uv + ui + uj)
+        
+                           enddo
+        
+                        enddo
+                      end associate      
+                   endif
                 enddo
 
              endif
@@ -408,6 +465,7 @@ do j_prim=1,jPairSystem%n_prim
            jexp = jPairSpec%iexp2
            kexp = iPairSpec%iexp2
            lexp = jPairSpec%iexp1
+
            call order_exp(iTwo,ijorder,klorder,ijklorder,iexp,jexp,kexp,lexp)
 
            associate(Two => TwoInt(iTwo))
@@ -422,47 +480,91 @@ do j_prim=1,jPairSystem%n_prim
                      &Wrong entry chosen in CCint2_matS!'
                 stop
              endif
-
+           
              if(ijklorder) then
+              
+                do ilam=0,2
+                   if(info(ilam)%isUsed) then
+                      associate(&
+                           offset_uv => offset_uv_vec(ilam),&
+                           coeff     => info(ilam)%coeff,&
+                           add_to_1  => info(ilam)%add_to_1,&
+                           add_to_2  => info(ilam)%add_to_2,&
+                           TwoL      => Two%ILambda(ilam))
 
-                jpos  = jPairSpec%offset
-                jflag = -1
-                do while(increment_PairSpec(uj,vj,tj,jflag,jPairSpec))
-                   jpos = jpos + 1
+                       ! write(*,*) 'B-even',ilam
+                       ! write(*,*) iGen,jGen,coeff
+                       ! write(*,*) add_to_1,add_to_2
 
-                   ipos  = iPairSpec%offset
-                   iflag = -1
-                   do while(increment_PairSpec(ui,vi,ti,iflag,iPairSpec))
-                      ipos = ipos + 1
+                        jpos  = jPairSpec%offset
+                        jflag = -1
+                        do while(increment_PairSpec(uj,vj,tj,jflag,jPairSpec))
+                           jpos = jpos + 1
+        
+                           ipos  = iPairSpec%offset
+                           iflag = -1
+                           do while(increment_PairSpec(ui,vi,ti,iflag,iPairSpec))
+                              ipos = ipos + 1
+                             
+                              matS(ipos,jpos) = matS(ipos,jpos) + & 
+                                   coeff * TwoL%r12(&
+                                   offset_t  + ti + tj + add_t)%elms( &
+                                   offset_uv + ui + vj + add_to_1, &
+                                   offset_uv + vi + uj + add_to_2)
 
-                    !  matS(ipos,jpos) = Two%r12(&
-                    !       offset_t  + ti + tj + add_t)%elms( &
-                    !       offset_uv + ui + vj, &
-                    !       offset_uv + vi + uj)
-
-                   enddo
-
+                            !  matS(ipos,jpos) = Two%r12(&
+                            !       offset_t  + ti + tj + add_t)%elms( &
+                            !       offset_uv + ui + vj, &
+                            !       offset_uv + vi + uj)
+        
+                           enddo
+        
+                        enddo
+                      end associate
+                   endif
                 enddo
 
              else
 
-                jpos  = jPairSpec%offset
-                jflag = -1
-                do while(increment_PairSpec(uj,vj,tj,jflag,jPairSpec))
-                   jpos = jpos + 1
+                do ilam=0,2
+                   if(info(ilam)%isUsed) then
+                      associate(&
+                           offset_uv => offset_uv_vec(ilam),&
+                           coeff     => info(ilam)%coeff,&
+                           add_to_1  => info(ilam)%add_to_1,&
+                           add_to_2  => info(ilam)%add_to_2,&
+                           TwoL      => Two%ILambda(ilam))
 
-                   ipos  = iPairSpec%offset
-                   iflag = -1
-                   do while(increment_PairSpec(ui,vi,ti,iflag,iPairSpec))
-                      ipos = ipos + 1
-
-                    !  matS(ipos,jpos) = Two%r12(&
-                    !       offset_t  + ti + tj + add_t)%elms( &
-                    !       offset_uv + vi + uj, &
-                    !       offset_uv + ui + vj)
-
-                   enddo
-
+                       ! write(*,*) 'B-odd',ilam
+                       ! write(*,*) iGen,jGen,coeff
+                       ! write(*,*) add_to_1,add_to_2
+ 
+                        jpos  = jPairSpec%offset
+                        jflag = -1
+                        do while(increment_PairSpec(uj,vj,tj,jflag,jPairSpec))
+                           jpos = jpos + 1
+        
+                           ipos  = iPairSpec%offset
+                           iflag = -1
+                           do while(increment_PairSpec(ui,vi,ti,iflag,iPairSpec))
+                              ipos = ipos + 1
+        
+                              matS(ipos,jpos) = matS(ipos,jpos) + &
+                                   coeff * TwoL%r12(&
+                                   offset_t  + ti + tj + add_t)%elms( &
+                                   offset_uv + vi + uj + add_to_2, &
+                                   offset_uv + ui + vj + add_to_1)
+        
+                            !  matS(ipos,jpos) = Two%r12(&
+                            !       offset_t  + ti + tj + add_t)%elms( &
+                            !       offset_uv + vi + uj, &
+                            !       offset_uv + ui + vj)
+        
+                           enddo
+        
+                        enddo
+                      end associate
+                   endif
                 enddo
 
              endif
@@ -1264,7 +1366,7 @@ do j_prim=1,size(PairReduced)
                           case(1,6)
                              add_to_uv = 1
                           case(4,5)
-                             add_to_uv(1) = 1
+                             add_to_uv(1) = 3 !1 - here is it ok?
                              add_to_uv(2) = 3
                           case default
                              write(LOUT,'(a)') 'Incorrect odd pair &
@@ -1383,6 +1485,7 @@ do j_prim=1,size(PairReduced)
            jexp = jPairSpec%iexp2
            kexp = iPairSpec%iexp2
            lexp = jPairSpec%iexp1
+          
            call order_exp(iTwo,ijorder,klorder,ijklorder,iexp,jexp,kexp,lexp)
 
            associate(Two => TwoInt(iTwo))
@@ -1485,7 +1588,7 @@ do j_prim=1,size(PairReduced)
                              add_to_uv = 1
                           case(4,5)
                              add_to_uv(1) = 3
-                             add_to_uv(2) = 1
+                             add_to_uv(2) = 3 !1
                           case default
                              write(LOUT,'(a)') 'Incorrect odd pair &
                                 & generator number in init3_TwoInt &
@@ -1682,7 +1785,6 @@ integer :: ctr
             call create_Izero(Two,max_lam)
 
 ! check I0 manually
-! ERROR!!! CHECK LATER -- DIFFERENCE WRT MATHEMATICA!!!!!!!!
 !            write(LOUT,'(5x,2f15.8)') Two%ijalphaPL,Two%klalphaPL
 !            do ctr=1,size(Two%t_val)
 !                   associate(&
@@ -1701,25 +1803,6 @@ integer :: ctr
             if(max_lam/=0) then
                call create_Ilambda(Two,max_lam)
             endif  
-! check Ilam manually
-! ERROR!!! CHECK LATER -- DIFFERENCE WRT MATHEMATICA!!!!!!!!
-!            write(LOUT,'(5x,2f15.8)') Two%ijalphaPL,Two%klalphaPL
-!            do ctr=1,size(Two%t_val)
-!                   associate(&
-!                     tval     => Two%t_val(ctr),&
-!                     lam      => Two%t_val(ctr)%lambda,&
-!                     two_t    => Two%t_val(ctr)%two_t,&
-!                     range_uv => Two%t_val(ctr)%level_range_uv(max_lam+1,:))
-!                           write(LOUT,'(2i3)') range_uv(2), range_uv(1)
-!                     do v=smallest_uv_vec(ctr-1),range_uv(2)
-!                        do u=smallest_uv_vec(ctr-1),range_uv(1)
-!                           write(LOUT,'(10x,4i3,a,es30.22)') lam,two_t,u,v,' : ',&
-!                                tval%elms(offset_uv + u,offset_uv + v)
-!                        enddo
-!                     enddo
-!
-!                    end associate
-!            enddo
 
             call rewrite_Ilambda(Two,t,pos_t,max_lam)
             call free_tval(Two,max_lam)
@@ -1759,19 +1842,11 @@ do ilam=max_lam,0,-1
    call mem_alloc(Two%t_val(ilam+1)%level_range_uv,max_lam+1,2)
    associate(tval => Two%t_val(ilam+1))
 
+! not general - should be done 
+! differently for higher angular momenta
      select case(ilam)
      case(0)
         do ilev=0,max_lam
-!           select case(ilev)
-!           case(0)
-!              ! for t, level=0: max_uv(I0,I1+1,I2)
-!              tval%level_range_uv(1,:) = & 
-!                   max(range_tmp(:,1),range_tmp(:,2)+1,range_tmp(:,3))
-!           case(1)
-!              ! for t, level=1: max_uv(I0,I1+1,I2)
-!              tval%level_range_uv(2,:) = & 
-!                   max(range_tmp(:,1),range_tmp(:,2)+1,range_tmp(:,3))
-! better way:
            if(ilev==max_lam) then
               ! for t, level=last: uv(I0)
               tval%level_range_uv(max_lam+1,:) = range_tmp(:,1)
@@ -1788,23 +1863,6 @@ do ilam=max_lam,0,-1
           
      case(1)
         do ilev=0,max_lam
-        !   select case(ilev)
-        !   case(0)
-        !      ! for t+2, level=0: max_uv(I1-1,I2)
-        !      tval%level_range_uv(1,:) = &
-        !           max(range_tmp(:,2)-1,range_tmp(:,3))
-        !   case(1)
-        !      ! for t+2, level=1: uv(I1-1)
-        !      tval%level_range_uv(2,:) = range_tmp(:,2)-1
-        !   case(2)
-        !      ! for t+2, level=2: uv(I1)
-        !      tval%level_range_uv(3,:) = range_tmp(:,2)
-        !   case default
-        !      write(LOUT,'(a)') 'ERROR!!! Incorrect number of &
-        !                 & levels for t=c+2 in level_range_uv!'
-        !      stop
-        !   end select   
-! better way?
            if(ilev==max_lam) then
               ! for t+2, level=last: uv(I1)
               tval%level_range_uv(max_lam+1,:) = range_tmp(:,2)
@@ -1825,22 +1883,6 @@ do ilam=max_lam,0,-1
 
      case(2)
         do ilev=0,max_lam
-        !   select case(ilev)
-        !   case(0)
-        !      ! for t+4, level=0: max_uv(I2-2)
-        !      tval%level_range_uv(1,:) = range_tmp(:,3)-2
-        !   case(1)
-        !      ! for t+4, level=1: max_uv(I2-1)
-        !      tval%level_range_uv(2,:) = range_tmp(:,3)-1
-        !   case(2)
-        !      ! for t+4, level=2: max_uv(I2)
-        !      tval%level_range_uv(3,:) = range_tmp(:,3)
-        !   case default
-        !      write(LOUT,'(a)') 'ERROR!!! Incorrect number of &
-        !                 & levels for t=c+4 in level_range_uv!'
-        !      stop
-        !   end select
-! better way
            if(ilev==max_lam) then
               ! for t+4, level=last: max_uv(I2)
               tval%level_range_uv(3,:) = range_tmp(:,3)
@@ -1960,9 +2002,6 @@ do ival=1,max_lam+1
               do u=smallest_uv,range_uv(1)
                  tval%elms(offset_uv + u,offset_uv + v) = &
                       int2_slater(u,v,two_t,Two%ijalphaPL,Two%klalphaPL)
-            !write(*,*) Two%ijalphaPL,Two%klalphaPL
-            !write(*,*) u,v,two_t, int2_slater(u,v,two_t,Two%ijalphaPL,Two%klalphaPL)
-            !write(*,*) tval%elms(offset_uv + u,offset_uv + v) 
               enddo
            enddo
 
@@ -2104,11 +2143,10 @@ do ilam=0,2
           r12      => TwoL%r12(pos_t), &
           range_uv2 => TwoL%range_uv(:,pos_t) )
 
-       !write(LOUT,'(4i3)') range_uv(2), range_uv(1), ilam, lam
-       !write(LOUT,'(2i3)') range_uv2(2), range_uv2(1)
        do v=smallest_uv_vec(ilam),range_uv2(2)
           do u=smallest_uv_vec(ilam),range_uv2(1)
-             r12%elms(offset_uv-ilam+u,offset_uv-ilam+v) = & 
+             !r12%elms(offset_uv-ilam+u,offset_uv-ilam+v) = & 
+             r12%elms(offset_uv_vec(ilam)+u,offset_uv_vec(ilam)+v) = & 
                  tval%elms(offset_uv + u,offset_uv + v)
           enddo
        enddo
@@ -2280,14 +2318,16 @@ integer :: ctr
                           'lam = ',ilam,',','t = ',t,',','max_u max_v = ',TwoL%range_uv(:,pos_t)
 ! check ILambda
 !              if(LPRINT>=100) then
-               if(LPRINT>=6) then
+               if(LPRINT>=66) then
                   associate(&
-                       r12      => TwoL%r12(pos_t), &
-                       range_uv => TwoL%range_uv(:,pos_t))
+                       r12       => TwoL%r12(pos_t), &
+                       range_uv  => TwoL%range_uv(:,pos_t),&
+                       offset_uv => offset_uv_veC(ilam))
                     do v=smallest_uv_vec(ilam),range_uv(2)
                        do u=smallest_uv_vec(ilam),range_uv(1)
                           write(LOUT,'(10x,2i3,a,es40.32)') u,v,' : ',&
-                               r12%elms(offset_uv-ilam+u,offset_uv-ilam+v)
+                              !r12%elms(offset_uv-ilam+u,offset_uv-ilam+v)
+                               r12%elms(offset_uv+u,offset_uv+v)
                        enddo
                     enddo
                   end associate
@@ -2323,5 +2363,140 @@ integer :: ctr
  endif
 
 end subroutine print_TwoInt
+
+subroutine get_genpair_info(iPairGen,jPairGen,ABtype,info)
+implicit none
+
+integer,intent(in) :: iPairGen,jPairGen
+character(1),intent(in) :: ABtype
+type(InfoGenPair) :: info(0:2)
+
+! init
+info(:)%isUsed = .false.
+info(:)%coeff = 0
+info(:)%add_to_1 = 0
+info(:)%add_to_2 = 0
+
+select case(ABtype)
+case('A','a')
+
+   if(iPairGen==jPairGen) then
+      ! even generators
+      select case(iPairGen)
+      case(1) ! S^e
+         info(0)%isUsed = .true.
+         info(0)%coeff = 0.5_prec
+      case(2) ! P^o
+         info(0)%isUsed = .true.
+         info(0)%coeff = 0.5_prec
+         info(0)%add_to_1 = 0
+         info(0)%add_to_2 = 2
+      case(3) ! P^e
+         info(0)%isUsed = .true.
+         info(0)%coeff = 0.5_prec
+         info(0)%add_to_1 = 2
+         info(0)%add_to_2 = 2
+         info(2)%isUsed = .true.
+         info(2)%coeff = -0.5_prec
+         info(2)%add_to_1 = 2
+         info(2)%add_to_2 = 2
+      case(4) ! D^e(1)
+         info(0)%isUsed = .true.
+         info(0)%coeff = 0.5_prec
+         info(0)%add_to_1 = 2
+         info(0)%add_to_2 = 2
+         info(2)%isUsed = .true.
+         info(2)%coeff = 0.1_prec
+         info(2)%add_to_1 = 2
+         info(2)%add_to_2 = 2
+      case(5) ! D^e(2)
+         info(0)%isUsed = .true.
+         info(0)%coeff = 0.5_prec
+         info(0)%add_to_1 = 0
+         info(0)%add_to_2 = 4
+      case default
+         write(LOUT,'(a)') 'Incorrect generator &
+          & passed to get_genpair_info (A-even))!!!'
+         stop
+      end select
+   else
+      ! odd generators
+      select case(iPairGen)
+      case(4,5)
+         info(1)%isUsed = .true.
+         info(1)%coeff = sqrt(0.3_prec)
+         info(1)%add_to_1 = 1
+         info(1)%add_to_2 = 3
+      case default
+         write(LOUT,'(a)') 'Incorrect generator &
+          & passed to get_genpair_info (A-odd))!!!'
+         stop
+      end select
+   endif
+
+case('B','b')
+
+   if(iPairGen==jPairGen) then
+      ! even generators
+      select case(iPairGen)
+      case(1) ! S^e
+         info(0)%isUsed = .true.
+         info(0)%coeff = 0.5_prec
+      case(2) ! P^o
+         info(1)%isUsed = .true.
+         info(1)%coeff = 0.5_prec
+         info(1)%add_to_1 = 1
+         info(1)%add_to_2 = 1
+      case(3) ! P^e
+         info(0)%isUsed = .true.
+         info(0)%coeff = 0.5_prec
+         info(0)%add_to_1 = 2
+         info(0)%add_to_2 = 2
+         info(2)%isUsed = .true.
+         info(2)%coeff = -0.5_prec
+         info(2)%add_to_1 = 2
+         info(2)%add_to_2 = 2
+      case(4) ! D^e(1)
+         info(0)%isUsed = .true.
+         info(0)%coeff = 0.5_prec
+         info(0)%add_to_1 = 2
+         info(0)%add_to_2 = 2
+         info(2)%isUsed = .true.
+         info(2)%coeff = 0.1_prec
+         info(2)%add_to_1 = 2
+         info(2)%add_to_2 = 2
+      case(5) ! D^e(2)
+         info(2)%isUsed = .true.
+         info(2)%coeff = 0.5_prec
+         info(2)%add_to_1 = 2
+         info(2)%add_to_2 = 2
+      case default
+         write(LOUT,'(a)') 'Incorrect generator &
+          & passed in get_genpair_info (B-even)!!!'
+         stop
+      end select
+   else
+      ! odd generators
+      select case(iPairGen)
+      case(4,5)
+         info(1)%isUsed = .true.
+         info(1)%coeff = sqrt(0.3_prec)
+         info(1)%add_to_1 = 3
+         info(1)%add_to_2 = 1
+      case default
+         write(LOUT,'(a)') 'Incorrect generator &
+          & passed in get_genpair_info (B-odd)!!!'
+         stop
+      end select
+   endif
+
+case default
+
+write(LOUT,'(a)') 'ERROR!!! Incorrect ABtype in get_genpair_info!'
+stop
+
+end select
+
+end subroutine get_genpair_info
 
 end module CCint2

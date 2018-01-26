@@ -24,6 +24,7 @@ public maxOmega_PairReduced,maxt_PairReduced,maxuv_PairReduced
 public check_gen_pairs
 public TripletData,init_Triplet,free_Triplet,shrink_Triplet,expand_Triplet
 public SCForbitalsData,init_SCForbitals,free_SCForbitals,print_SCForbitals
+public paste_matrix,add_matrix
 
 interface maxuv_PairReduced
 module procedure maxuv_PairReduced_not
@@ -2738,5 +2739,94 @@ integer,allocatable :: nbas(:)
  write(LOUT,'(a,f25.18)') 'from the SCF procedure:         ',SCForbitals%energy
  
 end subroutine print_SCForbitals
+
+subroutine paste_matrix(n1,n2,A,n1_offset,n2_offset,FULL,tran)
+implicit none
+
+integer,intent(in) :: n1,n2
+integer,intent(in) :: n1_offset,n2_offset
+real(prec),intent(in) :: A(n1,n2)
+real(prec),intent(inout) :: FULL(:,:)
+character(1),intent(in) :: tran
+real(prec) :: TMP(n2,n1)
+integer :: i
+
+!do i=1,n1
+!   write(*,*) A(i,i)
+!enddo
+
+select case(tran)
+case('T','t')
+
+   !FULL(n1_offset+1:n1_offset+n1,n2_offset+1:n2_offset+n2) = transpose(A)
+   TMP = transpose(A)
+   FULL(n1_offset+1:n1_offset+n2,n2_offset+1:n2_offset+n1) = TMP
+
+case('N','n')
+
+     FULL(n1_offset+1:n1_offset+n1,n2_offset+1:n2_offset+n2) = A
+
+case default
+
+   write(LOUT,'(a)') 'Incorrect option in add_matrix!!!'
+   stop
+end select
+
+end subroutine paste_matrix
+
+subroutine add_matrix(n1,n2,A,n1_offset,n2_offset,FULL,oper,tran)
+implicit none
+
+integer,intent(in) :: n1,n2
+integer,intent(in) :: n1_offset,n2_offset
+character(1),intent(in) :: oper,tran
+real(prec),intent(in) :: A(n1,n2)
+real(prec),intent(inout) :: FULL(:,:)
+real(prec) :: TMP(n2,n1)
+integer :: i
+
+select case(oper)
+case('P','p')
+
+!write(*,*) 'add_matrix_P'
+!do i=1,n1
+!   write(*,*) i,i,A(i,i)
+!enddo
+
+   select case(tran)
+   case('N','n')
+      FULL(n1_offset+1:n1_offset+n1,n2_offset+1:n2_offset+n2) = &
+      FULL(n1_offset+1:n1_offset+n1,n2_offset+1:n2_offset+n2) + A
+   case('T','t')
+      TMP = transpose(A)
+      FULL(n1_offset+1:n1_offset+n2,n2_offset+1:n2_offset+n1) = &
+      FULL(n1_offset+1:n1_offset+n2,n2_offset+1:n2_offset+n1) + TMP
+   case default
+      write(LOUT,'(a)') 'Wrong call of add_matrix!'
+      stop
+   end select
+
+case('M','m')
+
+   select case(tran)
+   case('N','n')
+      FULL(n1_offset+1:n1_offset+n1,n2_offset+1:n2_offset+n2) = &
+      FULL(n1_offset+1:n1_offset+n1,n2_offset+1:n2_offset+n2) - A
+   case('T','t')
+      TMP = transpose(A)
+      FULL(n1_offset+1:n1_offset+n2,n2_offset+1:n2_offset+n1) = &
+      FULL(n1_offset+1:n1_offset+n2,n2_offset+1:n2_offset+n1) - TMP
+   case default
+      write(LOUT,'(a)') 'Wrong call of add_matrix!'
+      stop
+
+   end select
+
+case default
+   write(LOUT,'(a)') 'Incorrect option in add_matrix!!!'
+   stop
+end select
+
+end subroutine add_matrix
 
 end module commontypes
