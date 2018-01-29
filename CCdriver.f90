@@ -297,6 +297,7 @@ private
       flush(LOUT)
    endif
 
+! matS
 ! <S^e|S^2> (S,T)
    call CCint2_matS('A',0,nbas(1),nbas(1),TMP, &
                System%PairSystem_G(1)%gen_type,&
@@ -335,10 +336,6 @@ private
    call add_matrix(nbas(2),nbas(2),TMP,0,0,matS(3)%matOne,'P','N')
    call add_matrix(nbas(2),nbas(2),TMP,0,0,matS(4)%matOne,'M','N')
 
-!do i=1,nbas(2)
-!      write(*,*) i,i,matS(3)%matOne(i,i)
-!enddo
-
 ! <P^e|P^e> (T)
    call CCint2_matS('A',0,nbas(3),nbas(3),TMP, &
                System%PairSystem_G(3)%gen_type,&
@@ -353,12 +350,8 @@ private
                System%PairSystem_G(3)%gen_type,&
                System%PairSystem_G(3)%PairSystem(1,1),&
                System%PairSystem_G(3)%PairSystem(1,1))
-!   ! here + / -?
-   call add_matrix(nbas(3),nbas(3),TMP,0,0,matS(5)%matOne,'P','N')
 
-!do i=1,nbas(3)
-!      write(*,*) i,i,matS(5)%matOne(i,i)
-!enddo
+   call add_matrix(nbas(3),nbas(3),TMP,0,0,matS(5)%matOne,'P','N')
 
 ! <D^e(1)|D^e(1)>
    call CCint2_matS('A',0,nbas(4),nbas(4),TMP, &
@@ -377,10 +370,6 @@ private
 
    call add_matrix(nbas(4),nbas(4),TMP,0,0,matS(6)%matOne,'P','N')
 
-!do i=1,nbas(4)
-!      write(*,*) i,i,matS(6)%matOne(i,i)
-!enddo
-!
 ! <D^e(2)|D^e(2)>
    call CCint2_matS('A',0,nbas(5),nbas(5),TMP, &
                System%PairSystem_G(5)%gen_type,&
@@ -435,7 +424,148 @@ private
 !      write(*,*) i,i,matS(6)%matOne(i,i)
 !enddo
 
+! matH
+! <S^e|S^2> (S,T)
+   call CCint2_matH('A',nbas(1),nbas(1),TMP, &
+           System%PairSystem_G(1)%gen_type,&
+           System%PairSystem_G(1)%gen_type,&
+           System%PairSystem_G(1)%PairSystem(1,1),&
+           System%PairSystem_G(1)%PairSystem(1,1),&
+           System%nucZ)
 
+   call paste_matrix(nbas(1),nbas(1),TMP,0,0,matF(1)%matOne,'N')
+   call paste_matrix(nbas(1),nbas(1),TMP,0,0,matF(2)%matOne,'N')
+
+   call CCint2_matH('B',nbas(1),nbas(1),TMP, &
+            System%PairSystem_G(1)%gen_type,&
+            System%PairSystem_G(1)%gen_type,&
+            System%PairSystem_G(1)%PairSystem(1,1),&
+            System%PairSystem_G(1)%PairSystem(1,1),&
+            System%nucZ)
+
+   call add_matrix(nbas(1),nbas(1),TMP,0,0,matF(1)%matOne,'P','N')
+   call add_matrix(nbas(1),nbas(1),TMP,0,0,matF(2)%matOne,'M','N')
+
+! <P^o|P^o> (S,T)
+   call CCint2_matH('A',nbas(2),nbas(2),TMP, &
+           System%PairSystem_G(2)%gen_type,&
+           System%PairSystem_G(2)%gen_type,&
+           System%PairSystem_G(2)%PairSystem(1,1),&
+          System%PairSystem_G(2)%PairSystem(1,1),&
+           System%nucZ)
+
+   call paste_matrix(nbas(2),nbas(2),TMP,0,0,matF(3)%matOne,'N')
+   call paste_matrix(nbas(2),nbas(2),TMP,0,0,matF(4)%matOne,'N')
+
+   call CCint2_matH('B',nbas(2),nbas(2),TMP, &
+           System%PairSystem_G(2)%gen_type,&
+           System%PairSystem_G(2)%gen_type,&
+           System%PairSystem_G(2)%PairSystem(1,1),&
+           System%PairSystem_G(2)%PairSystem(1,1),&
+           System%nucZ)
+
+   call add_matrix(nbas(2),nbas(2),TMP,0,0,matF(3)%matOne,'P','N')
+   call add_matrix(nbas(2),nbas(2),TMP,0,0,matF(4)%matOne,'M','N')
+
+! <P^e|P^e> (T)
+   call CCint2_matH('A',nbas(3),nbas(3),TMP, &
+           System%PairSystem_G(3)%gen_type,&
+           System%PairSystem_G(3)%gen_type,&
+           System%PairSystem_G(3)%PairSystem(1,1),&
+          System%PairSystem_G(3)%PairSystem(1,1),&
+           System%nucZ)
+
+   call paste_matrix(nbas(3),nbas(3),TMP,0,0,matF(5)%matOne,'N')
+
+   call CCint2_matH('B',nbas(3),nbas(3),TMP, &
+           System%PairSystem_G(3)%gen_type,&
+           System%PairSystem_G(3)%gen_type,&
+           System%PairSystem_G(3)%PairSystem(1,1),&
+          System%PairSystem_G(3)%PairSystem(1,1),&
+           System%nucZ)
+ 
+   call add_matrix(nbas(3),nbas(3),TMP,0,0,matF(5)%matOne,'P','N')
+
+! <D^e(1)|D^e(1)>
+   call CCint2_matH('A',nbas(4),nbas(4),TMP, &
+           System%PairSystem_G(4)%gen_type,&
+           System%PairSystem_G(4)%gen_type,&
+           System%PairSystem_G(4)%PairSystem(1,1),&
+          System%PairSystem_G(4)%PairSystem(1,1),&
+           System%nucZ)
+
+   call paste_matrix(nbas(4),nbas(4),TMP,0,0,matF(6)%matOne,'N')
+
+   call CCint2_matH('B',nbas(4),nbas(4),TMP, &
+           System%PairSystem_G(4)%gen_type,&
+           System%PairSystem_G(4)%gen_type,&
+           System%PairSystem_G(4)%PairSystem(1,1),&
+          System%PairSystem_G(4)%PairSystem(1,1),&
+           System%nucZ)
+
+   call add_matrix(nbas(4),nbas(4),TMP,0,0,matF(6)%matOne,'P','N')
+
+! <D^e(2)|D^e(2)>
+   call CCint2_matH('A',nbas(5),nbas(5),TMP, &
+               System%PairSystem_G(5)%gen_type,&
+               System%PairSystem_G(5)%gen_type,&
+               System%PairSystem_G(5)%PairSystem(1,1),&
+               System%PairSystem_G(5)%PairSystem(1,1),&
+               System%nucZ)
+
+   call paste_matrix(nbas(5),nbas(5),TMP,&
+                     nbas(4),nbas(4),matF(6)%matOne,'N')
+
+   call CCint2_matH('B',nbas(5),nbas(5),TMP, &
+               System%PairSystem_G(5)%gen_type,&
+               System%PairSystem_G(5)%gen_type,&
+               System%PairSystem_G(5)%PairSystem(1,1),&
+               System%PairSystem_G(5)%PairSystem(1,1),&
+               System%nucZ)
+
+   call add_matrix(nbas(5),nbas(5),TMP,&
+                   nbas(4),nbas(4),matF(6)%matOne,'P','N')
+
+! <D^e(1)|D^e(2)> 
+! <D^e(2)|D^e(1)>
+   call CCint2_matH('A',nbas(4),nbas(5),TMP, &
+               System%PairSystem_G(4)%gen_type,&
+               System%PairSystem_G(5)%gen_type,&
+               System%PairSystem_G(4)%PairSystem(1,1),&
+               System%PairSystem_G(5)%PairSystem(1,1),&
+               System%nucZ)
+
+   call paste_matrix(nbas(4),nbas(5),TMP,&
+                           0,nbas(4),matF(6)%matOne,'N')
+   call paste_matrix(nbas(4),nbas(5),TMP,&
+                           nbas(4),0,matF(6)%matOne,'T')
+
+   call CCint2_matH('B',nbas(4),nbas(5),TMP, &
+               System%PairSystem_G(4)%gen_type,&
+               System%PairSystem_G(5)%gen_type,&
+               System%PairSystem_G(4)%PairSystem(1,1),&
+               System%PairSystem_G(5)%PairSystem(1,1),&
+               System%nucZ)
+
+  call add_matrix(nbas(4),nbas(5),TMP,&
+                        0,nbas(4),matF(6)%matOne,'P','N')
+  call add_matrix(nbas(4),nbas(5),TMP,&
+                        nbas(4),0,matF(6)%matOne,'P','T')
+!tmp2 = 0
+!do i=1,nbas(4)
+!   do j=1,nbas(5)
+!      tmp2 = tmp2 + matF(6)%matOne(i,nbas(4)+j)**2
+!     tmp2 = tmp2 + matF(6)%matOne(nbas(4)+j,i)**2
+!   enddo
+!enddo
+!write(*,*) tmp2
+
+!do i=1,nbas(4)+nbas(5)
+!      write(*,*) i,i,matF(6)%matOne(i,i)
+!enddo
+
+
+! hapka: before eigenvalues test and shinking!
 !
 ! hapka: old_drake 
 !   call CCint2_matS('A',0,TMP,PairSystem,PairSystem)

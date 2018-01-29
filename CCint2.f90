@@ -13,6 +13,7 @@ public CCint2_matH,CCint2_matS,CCint2_vec,CCint2_val
 integer,parameter :: smallest_uv = -1
 integer,parameter :: offset_uv   = 1 - smallest_uv
 integer,parameter :: smallest_uv_vec(0:2) = [-1,0,1]
+!integer,parameter :: smallest_uv_vec(0:2) = [-1,-1,1]
 integer,parameter :: offset_uv_vec(0:2) = [1,1,1] - smallest_uv_vec
 
 integer,parameter :: smallest_t = -1
@@ -49,8 +50,9 @@ type(TwoIntData),allocatable :: TwoInt(:)
 
 type InfoGenPair
 logical :: isUsed
-integer :: add_to_1
-integer :: add_to_2
+integer :: add_to_1,add_to_1m
+integer :: add_to_2,add_to_2m
+integer :: cl1,cl1p,cl2,cl2p
 real(prec) :: coeff
 end type InfoGenPair
 
@@ -80,10 +82,13 @@ call free_TwoInt
 
 end subroutine free_CCint2
 
-subroutine CCint2_matH(ABtype,matH,iPairSystem,jPairSystem,nucZ)
+subroutine CCint2_matH(ABtype,n1,n2,matH,iGen,jGen,iPairSystem,jPairSystem,nucZ)
 implicit none
+
 character(1),intent(in) :: ABtype
-real(prec) :: matH(:,:)
+integer,intent(in) :: n1,n2
+real(prec) :: matH(n1,n2)
+integer,intent(in) :: iGen,jGen
 type(PairSystemData),intent(in) :: iPairSystem,jPairSystem
 real(prec),intent(in) :: nucZ
 integer :: i_prim,j_prim
@@ -94,7 +99,13 @@ integer :: uj,vj,tj,jpos,jflag
 real(prec) :: alphaPL,alphaMI,betaPL,betaMI
 real(prec) :: A0_pre1,A0_pre2,B0_pre1,B0_pre2,X1_pre
 integer :: aPL,aMI,bPL,bMI,cPL,cMI
+integer :: aPL_TMP,bPL_TMP
+integer :: ilam
+type(InfoGenPair) :: info(0:2)
 
+call get_genpair_info(iGen,jGen,ABtype,info)
+
+matH = 0
 do j_prim=1,jPairSystem%n_prim
    do i_prim=1,iPairSystem%n_prim
       associate(&
@@ -125,24 +136,53 @@ do j_prim=1,jPairSystem%n_prim
 
              call pre_element(Two)
 
-             jpos  = jPairSpec%offset
-             jflag = -1
-             do while(increment_PairSpec(uj,vj,tj,jflag,jPairSpec))
-                jpos = jpos + 1
+             do ilam=0,2
+                if(info(ilam)%isUsed) then
+                   associate(&
+                       coeff     => info(ilam)%coeff,&
+                       add_to_1  => info(ilam)%add_to_1,&
+                       add_to_2  => info(ilam)%add_to_2,&
+                       add_to_1m => info(ilam)%add_to_1m,&
+                       add_to_2m => info(ilam)%add_to_2m,&
+                       cl1  => info(ilam)%cl1, &
+                       cl1p => info(ilam)%cl1p,&
+                       cl2  => info(ilam)%cl2, &
+                       cl2p => info(ilam)%cl2p,&
+                       TwoL => Two%ILambda(ilam))
 
-                ipos  = iPairSpec%offset
-                iflag = -1
-                do while(increment_PairSpec(ui,vi,ti,iflag,iPairSpec))
-                   ipos = ipos + 1
+                    ! write(*,*) 'A-part',ilam
+                    ! write(*,*) iGen,jGen,coeff
+                    ! write(*,*) add_to_1,add_to_2
+                    ! write(*,*) add_to_1m,add_to_2m
+                    ! write(*,*) cl1, cl1p 
+                    ! write(*,*) cl2, cl2p 
 
-                   aPL = ui + uj; aMI = ui - uj
-                   bPL = vi + vj; bMI = vi - vj
-                   cPL = ti + tj; cMI = ti - tj
+                     jpos  = jPairSpec%offset
+                     jflag = -1
+                     do while(increment_PairSpec(uj,vj,tj,jflag,jPairSpec))
+                        jpos = jpos + 1
 
-                   matH(ipos,jpos) = get_element(Two)
+                        ipos  = iPairSpec%offset
+                        iflag = -1
+                        do while(increment_PairSpec(ui,vi,ti,iflag,iPairSpec))
+                           ipos = ipos + 1
 
-                enddo
+                           aPL_TMP = ui + uj
+                           aPL = ui + uj + add_to_1 
+                           aMI = ui - uj + add_to_1m
+                           bPL_TMP = vi + vj 
+                           bPL = vi + vj + add_to_2 
+                           bMI = vi - vj + add_to_2m
+                           cPL = ti + tj; cMI = ti - tj
 
+                           matH(ipos,jpos) = matH(ipos,jpos) + &
+                                     coeff * get_element(Two,cl1,cl1p,cl2,cl2p)
+
+                        enddo
+
+                     enddo
+                   end associate
+                endif
              enddo
 
            end associate
@@ -170,24 +210,53 @@ do j_prim=1,jPairSystem%n_prim
 
              call pre_element(Two)
 
-             jpos  = jPairSpec%offset
-             jflag = -1
-             do while(increment_PairSpec(uj,vj,tj,jflag,jPairSpec))
-                jpos = jpos + 1
+             do ilam=0,2
+                if(info(ilam)%isUsed) then
+                   associate(&
+                       coeff     => info(ilam)%coeff,&
+                       add_to_1  => info(ilam)%add_to_1,&
+                       add_to_2  => info(ilam)%add_to_2,&
+                       add_to_1m => info(ilam)%add_to_1m,&
+                       add_to_2m => info(ilam)%add_to_2m,&
+                       cl1  => info(ilam)%cl1, &
+                       cl1p => info(ilam)%cl1p,&
+                       cl2  => info(ilam)%cl2, &
+                       cl2p => info(ilam)%cl2p,&
+                       TwoL => Two%ILambda(ilam))
 
-                ipos  = iPairSpec%offset
-                iflag = -1
-                do while(increment_PairSpec(ui,vi,ti,iflag,iPairSpec))
-                   ipos = ipos + 1
+            ! write(*,*) 'B-part',ilam
+            ! write(*,*) iGen,jGen,coeff
+            ! write(*,*) add_to_1,add_to_2
+            ! write(*,*) add_to_1m,add_to_2m
+            ! write(*,*) cl1, cl1p 
+            ! write(*,*) cl2, cl2p 
 
-                   aPL = ui + vj; aMI = ui - vj
-                   bPL = vi + uj; bMI = vi - uj
-                   cPL = ti + tj; cMI = ti - tj
+                     jpos  = jPairSpec%offset
+                     jflag = -1
+                     do while(increment_PairSpec(uj,vj,tj,jflag,jPairSpec))
+                        jpos = jpos + 1
 
-                   matH(ipos,jpos) = get_element(Two)
+                        ipos  = iPairSpec%offset
+                        iflag = -1
+                        do while(increment_PairSpec(ui,vi,ti,iflag,iPairSpec))
+                           ipos = ipos + 1
 
-                enddo
+                           aPL_TMP = ui + vj 
+                           aPL = ui + vj + add_to_1 
+                           aMI = ui - vj + add_to_1m
+                           bPL_TMP = vi + uj
+                           bPL = vi + uj + add_to_2
+                           bMI = vi - uj + add_to_2m
+                           cPL = ti + tj; cMI = ti - tj
 
+                           matH(ipos,jpos) = matH(ipos,jpos) + &
+                                     coeff * get_element(Two,cl1,cl1p,cl2,cl2p)
+
+                        enddo
+
+                     enddo
+                   end associate
+                endif
              enddo
 
            end associate
@@ -231,85 +300,95 @@ contains
 
   endif
 
-  A0_pre1 = -(alphaPL**2 + alphaMI**2)/2._prec
-  A0_pre2 = alphaPL*alphaMI
+  A0_pre1 = -(alphaPL**2 + alphaMI**2) 
+  A0_pre2 = 2._prec*alphaPL*alphaMI
 
-  B0_pre1 = -(betaPL**2 + betaMI**2)/2._prec
-  B0_pre2 = betaPL*betaMI
+  B0_pre1 = -(betaPL**2 + betaMI**2)
+  B0_pre2 = 2._prec*betaPL*betaMI
 
-  X1_pre = -4._prec*nucZ
+  X1_pre = -8._prec*nucZ
 
   end subroutine pre_element
 
-  function get_element(Two) result(val)
+  function get_element(Two,cl1,cl1p,cl2,cl2p) result(val)
   implicit none
   real(prec) :: val
   type(TwoIntData),intent(in) :: Two
+  integer,intent(in) :: cl1,cl1p,cl2,cl2p
   logical :: isA2,isB2,isC2
   real(prec) :: A0,A1,A2
   real(prec) :: B0,B1,B2
   real(prec) :: cRATIO,C2
+  real(prec) :: C1
   integer :: pos_u,pos_v,pos_t
 
-  isA2 = (aPL>0)
-  isB2 = (bPL>0)
+  isA2 = (aPL_TMP>0)
+  isB2 = (bPL_TMP>0)
   isC2 = (cPL>0)
 
+  C1 = 8._prec
+
   A0 = A0_pre1
-  A1 = X1_pre + alphaPL*(aPL+2) + alphaMI*aMI
-  if(isA2) A2 = -(aPL**2 + aMI**2)/2 - aPL
+  A1 = X1_pre + 2._prec*(alphaPL*(aPL+2) + alphaMI*aMI)
+  if(isA2) A2 = -(aPL**2 + aMI**2) - 2*aPL + cl1 + cl1p
 
   B0 = B0_pre1
-  B1 = X1_pre + betaPL*(bPL+2) + betaMI*bMI
-  if(isB2) B2 = -(bPL**2 + bMI**2)/2 - bPL
+  B1 = X1_pre + 2._prec*(betaPL*(bPL+2) + betaMI*bMI)
+  if(isB2) B2 = -(bPL**2 + bMI**2) - 2*bPL + cl2 + cl2p
 
   if(isC2) then
 
      cRATIO = real(cMI,prec)/cPL
 
      A0 = A0 + A0_pre2*cRATIO
-     A1 = A1 - (alphaPL*aMI + alphaMI*(aPL+2))*cRATIO
-     if(isA2) A2 = A2 + (aMI*(aPL+1))*cRATIO
+     A1 = A1 - 2._prec*(alphaPL*aMI + alphaMI*(aPL+2))*cRATIO
+
+     if(isA2) A2 = A2 + 2._prec*(aMI*(aPL+1))*cRATIO + &
+                 cl1*cRATIO - cl1p*cRATIO
 
      B0 = B0 + B0_pre2*cRATIO
-     B1 = B1 - (betaPL*bMI + betaMI*(bPL+2))*cRATIO
-     if(isB2) B2 = B2 + (bMI*(bPL+1))*cRATIO
+     B1 = B1 - 2._prec*(betaPL*bMI + betaMI*(bPL+2))*cRATIO
+     if(isB2) B2 = B2 + 2._prec*(bMI*(bPL+1))*cRATIO + &
+                 cl2*cRATIO - cl2p*cRATIO
 
-     C2 = cPL**2 - cMI**2
+     C2 = 2._prec*(cPL**2 - cMI**2)
 
   endif
 
   pos_t = offset_t  + cPL
 
-!  associate(elms => Two%r12(pos_t)%elms)
-!    if(ijklorder) then
-!
-!       pos_u = offset_uv + aPL
-!       pos_v = offset_uv + bPL
-!
-!       val = (A0 + B0)*elms(pos_u,pos_v) &
-!            + A1*elms(pos_u-1,pos_v) &
-!            + B1*elms(pos_u,pos_v-1)
-!       if(isA2) val = val + A2*elms(pos_u-2,pos_v)
-!       if(isB2) val = val + B2*elms(pos_u,pos_v-2)
-!
-!    else
-!
-!       pos_u = offset_uv + bPL
-!       pos_v = offset_uv + aPL
-!
-!       val = (B0 + A0)*elms(pos_u,pos_v) &
-!            + B1*elms(pos_u-1,pos_v) &
-!            + A1*elms(pos_u,pos_v-1)
-!       if(isB2) val = val + B2*elms(pos_u-2,pos_v)
-!       if(isA2) val = val + A2*elms(pos_u,pos_v-2)
-!
-!    endif
-!  end associate
-!
-!  if(isC2) val = val + C2*Two%r12(pos_t-2)%elms(pos_u,pos_v)
+  associate(elms => Two%ILambda(ilam)%r12(pos_t)%elms)
+    if(ijklorder) then
 
-  val = val/4._prec
+       pos_u = offset_uv_vec(ilam) + aPL
+       pos_v = offset_uv_vec(ilam) + bPL
+
+       val = (A0 + B0)*elms(pos_u,pos_v) &
+            + A1*elms(pos_u-1,pos_v) &
+            + B1*elms(pos_u,pos_v-1)
+       if(isA2) val = val + A2*elms(pos_u-2,pos_v)
+       if(isB2) val = val + B2*elms(pos_u,pos_v-2)
+
+    else
+
+       pos_u = offset_uv_vec(ilam) + bPL
+       pos_v = offset_uv_vec(ilam) + aPL
+
+       val = (B0 + A0)*elms(pos_u,pos_v) &
+            + B1*elms(pos_u-1,pos_v) &
+            + A1*elms(pos_u,pos_v-1)
+       if(isB2) val = val + B2*elms(pos_u-2,pos_v)
+       if(isA2) val = val + A2*elms(pos_u,pos_v-2)
+
+    endif
+  end associate
+
+            val = val + & 
+           C1*Two%ILambda(ilam)%r12(pos_t-1)%elms(pos_u,pos_v)
+  if(isC2) val = val + & 
+           C2*Two%ILambda(ilam)%r12(pos_t-2)%elms(pos_u,pos_v)
+
+  val = val/8._prec
 
   end function get_element
 
@@ -331,7 +410,6 @@ integer :: ui,vi,ti,ipos,iflag
 integer :: uj,vj,tj,jpos,jflag
 integer :: ilam
 type(InfoGenPair) :: info(0:2)
-integer ::i 
 
 if(add_t<smallest_t) then
    write(LOUT,'(a)') 'ERROR!!! &
@@ -381,9 +459,9 @@ do j_prim=1,jPairSystem%n_prim
                            add_to_2 => info(ilam)%add_to_2,&
                            TwoL => Two%ILambda(ilam))
 
-                        !write(*,*) 'A-even',ilam
-                        !write(*,*) iGen,jGen,coeff
-                        !write(*,*) add_to_1,add_to_2
+                       ! write(*,*) 'A-even',ilam
+                       ! write(*,*) iGen,jGen,coeff
+                       ! write(*,*) add_to_1,add_to_2
                         jpos  = jPairSpec%offset
                         jflag = -1
                         do while(increment_PairSpec(uj,vj,tj,jflag,jPairSpec))
@@ -2376,6 +2454,12 @@ info(:)%isUsed = .false.
 info(:)%coeff = 0
 info(:)%add_to_1 = 0
 info(:)%add_to_2 = 0
+info(:)%add_to_1m = 0
+info(:)%add_to_2m = 0
+info(:)%cl1  = 0
+info(:)%cl1p = 0
+info(:)%cl2  = 0
+info(:)%cl2p = 0
 
 select case(ABtype)
 case('A','a')
@@ -2391,29 +2475,53 @@ case('A','a')
          info(0)%coeff = 0.5_prec
          info(0)%add_to_1 = 0
          info(0)%add_to_2 = 2
+         info(0)%cl1  = 0
+         info(0)%cl1p = 0
+         info(0)%cl2  = 4
+         info(0)%cl2p = 4
       case(3) ! P^e
          info(0)%isUsed = .true.
          info(0)%coeff = 0.5_prec
          info(0)%add_to_1 = 2
          info(0)%add_to_2 = 2
+         info(0)%cl1  = 4
+         info(0)%cl1p = 4
+         info(0)%cl2  = 4
+         info(0)%cl2p = 4
          info(2)%isUsed = .true.
          info(2)%coeff = -0.5_prec
          info(2)%add_to_1 = 2
          info(2)%add_to_2 = 2
+         info(2)%cl1  = 4
+         info(2)%cl1p = 4
+         info(2)%cl2  = 4
+         info(2)%cl2p = 4
       case(4) ! D^e(1)
          info(0)%isUsed = .true.
          info(0)%coeff = 0.5_prec
          info(0)%add_to_1 = 2
          info(0)%add_to_2 = 2
+         info(0)%cl1  = 4
+         info(0)%cl1p = 4
+         info(0)%cl2  = 4
+         info(0)%cl2p = 4
          info(2)%isUsed = .true.
          info(2)%coeff = 0.1_prec
          info(2)%add_to_1 = 2
          info(2)%add_to_2 = 2
+         info(2)%cl1  = 4
+         info(2)%cl1p = 4
+         info(2)%cl2  = 4
+         info(2)%cl2p = 4
       case(5) ! D^e(2)
          info(0)%isUsed = .true.
          info(0)%coeff = 0.5_prec
          info(0)%add_to_1 = 0
          info(0)%add_to_2 = 4
+         info(0)%cl1  = 0
+         info(0)%cl1p = 0
+         info(0)%cl2  = 12
+         info(0)%cl2p = 12
       case default
          write(LOUT,'(a)') 'Incorrect generator &
           & passed to get_genpair_info (A-even))!!!'
@@ -2422,11 +2530,28 @@ case('A','a')
    else
       ! odd generators
       select case(iPairGen)
-      case(4,5)
+      case(4)
          info(1)%isUsed = .true.
          info(1)%coeff = sqrt(0.3_prec)
          info(1)%add_to_1 = 1
          info(1)%add_to_2 = 3
+         info(1)%add_to_1m = 1
+         info(1)%add_to_2m = -1
+         info(1)%cl1  = 0
+         info(1)%cl1p = 4
+         info(1)%cl2  = 12
+         info(1)%cl2p = 4
+      case(5)
+         info(1)%isUsed = .true.
+         info(1)%coeff = sqrt(0.3_prec)
+         info(1)%add_to_1 = 1
+         info(1)%add_to_2 = 3
+         info(1)%add_to_1m = -1
+         info(1)%add_to_2m = 1
+         info(1)%cl1  = 4
+         info(1)%cl1p = 0
+         info(1)%cl2  = 4 
+         info(1)%cl2p = 12
       case default
          write(LOUT,'(a)') 'Incorrect generator &
           & passed to get_genpair_info (A-odd))!!!'
@@ -2447,29 +2572,57 @@ case('B','b')
          info(1)%coeff = 0.5_prec
          info(1)%add_to_1 = 1
          info(1)%add_to_2 = 1
+         info(1)%add_to_1m = -1
+         info(1)%add_to_2m = 1
+         info(1)%cl1  = 4
+         info(1)%cl1p = 0
+         info(1)%cl2  = 0  
+         info(1)%cl2p = 4 
       case(3) ! P^e
          info(0)%isUsed = .true.
          info(0)%coeff = 0.5_prec
          info(0)%add_to_1 = 2
          info(0)%add_to_2 = 2
+         info(0)%cl1  = 4
+         info(0)%cl1p = 4
+         info(0)%cl2  = 4 
+         info(0)%cl2p = 4 
          info(2)%isUsed = .true.
          info(2)%coeff = -0.5_prec
          info(2)%add_to_1 = 2
          info(2)%add_to_2 = 2
+         info(2)%cl1  = 4
+         info(2)%cl1p = 4
+         info(2)%cl2  = 4 
+         info(2)%cl2p = 4 
       case(4) ! D^e(1)
          info(0)%isUsed = .true.
          info(0)%coeff = 0.5_prec
          info(0)%add_to_1 = 2
          info(0)%add_to_2 = 2
+         info(0)%cl1  = 4
+         info(0)%cl1p = 4
+         info(0)%cl2  = 4 
+         info(0)%cl2p = 4 
          info(2)%isUsed = .true.
          info(2)%coeff = 0.1_prec
          info(2)%add_to_1 = 2
          info(2)%add_to_2 = 2
+         info(2)%cl1  = 4
+         info(2)%cl1p = 4
+         info(2)%cl2  = 4 
+         info(2)%cl2p = 4 
       case(5) ! D^e(2)
          info(2)%isUsed = .true.
          info(2)%coeff = 0.5_prec
          info(2)%add_to_1 = 2
          info(2)%add_to_2 = 2
+         info(2)%add_to_1m = -2
+         info(2)%add_to_2m = 2
+         info(2)%cl1  = 12
+         info(2)%cl1p = 0
+         info(2)%cl2  = 0 
+         info(2)%cl2p = 12
       case default
          write(LOUT,'(a)') 'Incorrect generator &
           & passed in get_genpair_info (B-even)!!!'
@@ -2478,11 +2631,28 @@ case('B','b')
    else
       ! odd generators
       select case(iPairGen)
-      case(4,5)
+      case(4)
          info(1)%isUsed = .true.
          info(1)%coeff = sqrt(0.3_prec)
          info(1)%add_to_1 = 3
          info(1)%add_to_2 = 1
+         info(1)%add_to_1m = -1
+         info(1)%add_to_2m = 1
+         info(1)%cl1  = 12
+         info(1)%cl1p = 4
+         info(1)%cl2  = 0 
+         info(1)%cl2p = 4 
+      case(5)
+         info(1)%isUsed = .true.
+         info(1)%coeff = sqrt(0.3_prec)
+         info(1)%add_to_1 = 3
+         info(1)%add_to_2 = 1
+         info(1)%add_to_1m = 1
+         info(1)%add_to_2m = -1
+         info(1)%cl1  = 4 
+         info(1)%cl1p = 12
+         info(1)%cl2  = 4 
+         info(1)%cl2p = 0 
       case default
          write(LOUT,'(a)') 'Incorrect generator &
           & passed in get_genpair_info (B-odd)!!!'
