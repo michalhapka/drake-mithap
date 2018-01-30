@@ -6,6 +6,7 @@ use lproblem
 use commontypes
 use CCint2
 use CCint3
+use eproblem_qd 
 implicit none
 
 private
@@ -34,10 +35,12 @@ private
  integer :: start,end
  end type OSdata
 
- ! contains singlet/triplet matS, matF
+ ! contains matS, matF
  type matOnedata
  integer :: size
- real(prec),allocatable :: matOne(:,:)
+ real(prec),allocatable :: matS(:,:)
+ real(prec),allocatable :: matF(:,:)
+ type(TripletData),allocatable :: Triplet
  end type matOnedata
 
  integer,parameter :: power_LIMIT = -16
@@ -167,7 +170,7 @@ private
  integer :: ipair,jpair,ijpair,iorb,jorb,korb
  real(prec) :: eta,factor
  real(prec) :: energy_this,energy_prev,edelta_this,edelta_prev
- type(matOnedata),allocatable :: matS(:),matF(:)
+ type(matOnedata),allocatable :: matOne(:) 
  real(prec),allocatable :: matS_S(:,:),matS_T(:,:)
  real(prec),allocatable :: matF_S(:,:),matF_T(:,:)
  real(prec),allocatable :: matP1_S(:,:),matP1_T(:,:)
@@ -229,7 +232,7 @@ private
  call mem_alloc(nbas,System%NumGen)
  norb = System%norb
 
- allocate(matS(System%NumGen+1),matF(System%NumGen+1))
+  allocate(matOne(System%NumGen+1))
 
  nbas = 0; nbas2 = 0
  do igen=1,System%NumGen
@@ -243,19 +246,22 @@ private
  nbas2 = max(nbas2,nbas(4)*nbas(5))
  call mem_alloc(TMP,nbas2)
 
- call mem_alloc(matS(1)%matOne,nbas(1),nbas(1))
- call mem_alloc(matS(2)%matOne,nbas(1),nbas(1))
- call mem_alloc(matS(3)%matOne,nbas(2),nbas(2))
- call mem_alloc(matS(4)%matOne,nbas(2),nbas(2))
- call mem_alloc(matS(5)%matOne,nbas(3),nbas(3))
- call mem_alloc(matS(6)%matOne,nbas(4)+nbas(5),nbas(4)+nbas(5))
+  matOne(1)%size = nbas(1)
+  matOne(2)%size = nbas(1)
+  matOne(3)%size = nbas(2)
+  matOne(4)%size = nbas(2)
+  matOne(5)%size = nbas(3)
+  matOne(6)%size = nbas(4)+nbas(5)
+  allocate(matOne(2)%Triplet)
+  call init_Triplet(matOne(2)%Triplet,&
+            System%PairSystem_G(1)%PairSystem(1,1))
 
- call mem_alloc(matF(1)%matOne,nbas(1),nbas(1))
- call mem_alloc(matF(2)%matOne,nbas(1),nbas(1))
- call mem_alloc(matF(3)%matOne,nbas(2),nbas(2))
- call mem_alloc(matF(4)%matOne,nbas(2),nbas(2))
- call mem_alloc(matF(5)%matOne,nbas(3),nbas(3))
- call mem_alloc(matF(6)%matOne,nbas(4)+nbas(5),nbas(4)+nbas(5))
+ do igen=1,6
+    call mem_alloc(matOne(igen)%matS,&
+             matOne(igen)%size,matOne(igen)%size)
+    call mem_alloc(matOne(igen)%matF,&
+             matOne(igen)%size,matOne(igen)%size)
+ enddo
 
 ! hapka: old_drake
 ! associate(PairSystem => System%PairSystem(1,1))
@@ -305,8 +311,8 @@ private
                System%PairSystem_G(1)%PairSystem(1,1),&
                System%PairSystem_G(1)%PairSystem(1,1))
 
-   call paste_matrix(nbas(1),nbas(1),TMP,0,0,matS(1)%matOne,'N')
-   call paste_matrix(nbas(1),nbas(1),TMP,0,0,matS(2)%matOne,'N')
+   call paste_matrix(nbas(1),nbas(1),TMP,0,0,matOne(1)%matS,'N')
+   call paste_matrix(nbas(1),nbas(1),TMP,0,0,matOne(2)%matS,'N')
 
    call CCint2_matS('B',0,nbas(1),nbas(1),TMP, &
                System%PairSystem_G(1)%gen_type,&
@@ -314,8 +320,8 @@ private
                System%PairSystem_G(1)%PairSystem(1,1),&
                System%PairSystem_G(1)%PairSystem(1,1))
 
-   call add_matrix(nbas(1),nbas(1),TMP,0,0,matS(1)%matOne,'P','N')
-   call add_matrix(nbas(1),nbas(1),TMP,0,0,matS(2)%matOne,'M','N')
+   call add_matrix(nbas(1),nbas(1),TMP,0,0,matOne(1)%matS,'P','N')
+   call add_matrix(nbas(1),nbas(1),TMP,0,0,matOne(2)%matS,'M','N')
 
 ! <P^o|P^o> (S,T)
    call CCint2_matS('A',0,nbas(2),nbas(2),TMP, &
@@ -324,8 +330,8 @@ private
                System%PairSystem_G(2)%PairSystem(1,1),&
                System%PairSystem_G(2)%PairSystem(1,1))
 
-   call paste_matrix(nbas(2),nbas(2),TMP,0,0,matS(3)%matOne,'N')
-   call paste_matrix(nbas(2),nbas(2),TMP,0,0,matS(4)%matOne,'N')
+   call paste_matrix(nbas(2),nbas(2),TMP,0,0,matOne(3)%matS,'N')
+   call paste_matrix(nbas(2),nbas(2),TMP,0,0,matOne(4)%matS,'N')
 
    call CCint2_matS('B',0,nbas(2),nbas(2),TMP, &
                System%PairSystem_G(2)%gen_type,&
@@ -333,8 +339,8 @@ private
                System%PairSystem_G(2)%PairSystem(1,1),&
                System%PairSystem_G(2)%PairSystem(1,1))
 
-   call add_matrix(nbas(2),nbas(2),TMP,0,0,matS(3)%matOne,'P','N')
-   call add_matrix(nbas(2),nbas(2),TMP,0,0,matS(4)%matOne,'M','N')
+   call add_matrix(nbas(2),nbas(2),TMP,0,0,matOne(3)%matS,'P','N')
+   call add_matrix(nbas(2),nbas(2),TMP,0,0,matOne(4)%matS,'M','N')
 
 ! <P^e|P^e> (T)
    call CCint2_matS('A',0,nbas(3),nbas(3),TMP, &
@@ -343,7 +349,7 @@ private
                System%PairSystem_G(3)%PairSystem(1,1),&
                System%PairSystem_G(3)%PairSystem(1,1))
 
-   call paste_matrix(nbas(3),nbas(3),TMP,0,0,matS(5)%matOne,'N')
+   call paste_matrix(nbas(3),nbas(3),TMP,0,0,matOne(5)%matS,'N')
 
    call CCint2_matS('B',0,nbas(3),nbas(3),TMP, &
                System%PairSystem_G(3)%gen_type,&
@@ -351,7 +357,7 @@ private
                System%PairSystem_G(3)%PairSystem(1,1),&
                System%PairSystem_G(3)%PairSystem(1,1))
 
-   call add_matrix(nbas(3),nbas(3),TMP,0,0,matS(5)%matOne,'P','N')
+   call add_matrix(nbas(3),nbas(3),TMP,0,0,matOne(5)%matS,'P','N')
 
 ! <D^e(1)|D^e(1)>
    call CCint2_matS('A',0,nbas(4),nbas(4),TMP, &
@@ -360,7 +366,7 @@ private
                System%PairSystem_G(4)%PairSystem(1,1),&
                System%PairSystem_G(4)%PairSystem(1,1))
 
-   call paste_matrix(nbas(4),nbas(4),TMP,0,0,matS(6)%matOne,'N')
+   call paste_matrix(nbas(4),nbas(4),TMP,0,0,matOne(6)%matS,'N')
 
    call CCint2_matS('B',0,nbas(4),nbas(4),TMP, &
                System%PairSystem_G(4)%gen_type,&
@@ -368,7 +374,7 @@ private
               System%PairSystem_G(4)%PairSystem(1,1),&
                System%PairSystem_G(4)%PairSystem(1,1))
 
-   call add_matrix(nbas(4),nbas(4),TMP,0,0,matS(6)%matOne,'P','N')
+   call add_matrix(nbas(4),nbas(4),TMP,0,0,matOne(6)%matS,'P','N')
 
 ! <D^e(2)|D^e(2)>
    call CCint2_matS('A',0,nbas(5),nbas(5),TMP, &
@@ -378,7 +384,7 @@ private
                System%PairSystem_G(5)%PairSystem(1,1))
 
    call paste_matrix(nbas(5),nbas(5),TMP,&
-                     nbas(4),nbas(4),matS(6)%matOne,'N')
+                     nbas(4),nbas(4),matOne(6)%matS,'N')
 
    call CCint2_matS('B',0,nbas(5),nbas(5),TMP, &
                System%PairSystem_G(5)%gen_type,&
@@ -387,7 +393,7 @@ private
                System%PairSystem_G(5)%PairSystem(1,1))
 
    call add_matrix(nbas(5),nbas(5),TMP,&
-                   nbas(4),nbas(4),matS(6)%matOne,'P','N')
+                   nbas(4),nbas(4),matOne(6)%matS,'P','N')
 
 ! <D^e(1)|D^e(2)> 
 ! <D^e(2)|D^e(1)>
@@ -398,9 +404,9 @@ private
                System%PairSystem_G(5)%PairSystem(1,1))
 
    call paste_matrix(nbas(4),nbas(5),TMP,&
-                           0,nbas(4),matS(6)%matOne,'N')
+                           0,nbas(4),matOne(6)%matS,'N')
    call paste_matrix(nbas(4),nbas(5),TMP,&
-                           nbas(4),0,matS(6)%matOne,'T')
+                           nbas(4),0,matOne(6)%matS,'T')
 
    call CCint2_matS('B',0,nbas(4),nbas(5),TMP, &
                System%PairSystem_G(4)%gen_type,&
@@ -409,20 +415,9 @@ private
                System%PairSystem_G(5)%PairSystem(1,1))
 
   call add_matrix(nbas(4),nbas(5),TMP,&
-                        0,nbas(4),matS(6)%matOne,'P','N')
+                        0,nbas(4),matOne(6)%matS,'P','N')
   call add_matrix(nbas(4),nbas(5),TMP,&
-                        nbas(4),0,matS(6)%matOne,'P','T')
-
-!do i=1,nbas(4)
-!   do j=1,nbas(5)
-!      tmp2 = tmp2 + matS(6)%matOne(nbas(4)+j,i)**2
-!   enddo
-!enddo
-!write(*,*) tmp2
-
-!do i=1,nbas(4)+nbas(5)
-!      write(*,*) i,i,matS(6)%matOne(i,i)
-!enddo
+                        nbas(4),0,matOne(6)%matS,'P','T')
 
 ! matH
 ! <S^e|S^2> (S,T)
@@ -433,8 +428,8 @@ private
            System%PairSystem_G(1)%PairSystem(1,1),&
            System%nucZ)
 
-   call paste_matrix(nbas(1),nbas(1),TMP,0,0,matF(1)%matOne,'N')
-   call paste_matrix(nbas(1),nbas(1),TMP,0,0,matF(2)%matOne,'N')
+   call paste_matrix(nbas(1),nbas(1),TMP,0,0,matOne(1)%matF,'N')
+   call paste_matrix(nbas(1),nbas(1),TMP,0,0,matOne(2)%matF,'N')
 
    call CCint2_matH('B',nbas(1),nbas(1),TMP, &
             System%PairSystem_G(1)%gen_type,&
@@ -443,8 +438,8 @@ private
             System%PairSystem_G(1)%PairSystem(1,1),&
             System%nucZ)
 
-   call add_matrix(nbas(1),nbas(1),TMP,0,0,matF(1)%matOne,'P','N')
-   call add_matrix(nbas(1),nbas(1),TMP,0,0,matF(2)%matOne,'M','N')
+   call add_matrix(nbas(1),nbas(1),TMP,0,0,matOne(1)%matF,'P','N')
+   call add_matrix(nbas(1),nbas(1),TMP,0,0,matOne(2)%matF,'M','N')
 
 ! <P^o|P^o> (S,T)
    call CCint2_matH('A',nbas(2),nbas(2),TMP, &
@@ -454,8 +449,8 @@ private
           System%PairSystem_G(2)%PairSystem(1,1),&
            System%nucZ)
 
-   call paste_matrix(nbas(2),nbas(2),TMP,0,0,matF(3)%matOne,'N')
-   call paste_matrix(nbas(2),nbas(2),TMP,0,0,matF(4)%matOne,'N')
+   call paste_matrix(nbas(2),nbas(2),TMP,0,0,matOne(3)%matF,'N')
+   call paste_matrix(nbas(2),nbas(2),TMP,0,0,matOne(4)%matF,'N')
 
    call CCint2_matH('B',nbas(2),nbas(2),TMP, &
            System%PairSystem_G(2)%gen_type,&
@@ -464,8 +459,8 @@ private
            System%PairSystem_G(2)%PairSystem(1,1),&
            System%nucZ)
 
-   call add_matrix(nbas(2),nbas(2),TMP,0,0,matF(3)%matOne,'P','N')
-   call add_matrix(nbas(2),nbas(2),TMP,0,0,matF(4)%matOne,'M','N')
+   call add_matrix(nbas(2),nbas(2),TMP,0,0,matOne(3)%matF,'P','N')
+   call add_matrix(nbas(2),nbas(2),TMP,0,0,matOne(4)%matF,'M','N')
 
 ! <P^e|P^e> (T)
    call CCint2_matH('A',nbas(3),nbas(3),TMP, &
@@ -475,7 +470,7 @@ private
           System%PairSystem_G(3)%PairSystem(1,1),&
            System%nucZ)
 
-   call paste_matrix(nbas(3),nbas(3),TMP,0,0,matF(5)%matOne,'N')
+   call paste_matrix(nbas(3),nbas(3),TMP,0,0,matOne(5)%matF,'N')
 
    call CCint2_matH('B',nbas(3),nbas(3),TMP, &
            System%PairSystem_G(3)%gen_type,&
@@ -484,7 +479,7 @@ private
           System%PairSystem_G(3)%PairSystem(1,1),&
            System%nucZ)
  
-   call add_matrix(nbas(3),nbas(3),TMP,0,0,matF(5)%matOne,'P','N')
+   call add_matrix(nbas(3),nbas(3),TMP,0,0,matOne(5)%matF,'P','N')
 
 ! <D^e(1)|D^e(1)>
    call CCint2_matH('A',nbas(4),nbas(4),TMP, &
@@ -494,7 +489,7 @@ private
           System%PairSystem_G(4)%PairSystem(1,1),&
            System%nucZ)
 
-   call paste_matrix(nbas(4),nbas(4),TMP,0,0,matF(6)%matOne,'N')
+   call paste_matrix(nbas(4),nbas(4),TMP,0,0,matOne(6)%matF,'N')
 
    call CCint2_matH('B',nbas(4),nbas(4),TMP, &
            System%PairSystem_G(4)%gen_type,&
@@ -503,7 +498,7 @@ private
           System%PairSystem_G(4)%PairSystem(1,1),&
            System%nucZ)
 
-   call add_matrix(nbas(4),nbas(4),TMP,0,0,matF(6)%matOne,'P','N')
+   call add_matrix(nbas(4),nbas(4),TMP,0,0,matOne(6)%matF,'P','N')
 
 ! <D^e(2)|D^e(2)>
    call CCint2_matH('A',nbas(5),nbas(5),TMP, &
@@ -514,7 +509,7 @@ private
                System%nucZ)
 
    call paste_matrix(nbas(5),nbas(5),TMP,&
-                     nbas(4),nbas(4),matF(6)%matOne,'N')
+                     nbas(4),nbas(4),matOne(6)%matF,'N')
 
    call CCint2_matH('B',nbas(5),nbas(5),TMP, &
                System%PairSystem_G(5)%gen_type,&
@@ -524,7 +519,7 @@ private
                System%nucZ)
 
    call add_matrix(nbas(5),nbas(5),TMP,&
-                   nbas(4),nbas(4),matF(6)%matOne,'P','N')
+                   nbas(4),nbas(4),matOne(6)%matF,'P','N')
 
 ! <D^e(1)|D^e(2)> 
 ! <D^e(2)|D^e(1)>
@@ -536,9 +531,9 @@ private
                System%nucZ)
 
    call paste_matrix(nbas(4),nbas(5),TMP,&
-                           0,nbas(4),matF(6)%matOne,'N')
+                           0,nbas(4),matOne(6)%matF,'N')
    call paste_matrix(nbas(4),nbas(5),TMP,&
-                           nbas(4),0,matF(6)%matOne,'T')
+                           nbas(4),0,matOne(6)%matF,'T')
 
    call CCint2_matH('B',nbas(4),nbas(5),TMP, &
                System%PairSystem_G(4)%gen_type,&
@@ -548,24 +543,69 @@ private
                System%nucZ)
 
   call add_matrix(nbas(4),nbas(5),TMP,&
-                        0,nbas(4),matF(6)%matOne,'P','N')
+                        0,nbas(4),matOne(6)%matF,'P','N')
   call add_matrix(nbas(4),nbas(5),TMP,&
-                        nbas(4),0,matF(6)%matOne,'P','T')
-!tmp2 = 0
-!do i=1,nbas(4)
-!   do j=1,nbas(5)
-!      tmp2 = tmp2 + matF(6)%matOne(i,nbas(4)+j)**2
-!     tmp2 = tmp2 + matF(6)%matOne(nbas(4)+j,i)**2
-!   enddo
+                        nbas(4),0,matOne(6)%matF,'P','T')
+
+!
+! test diagonalization
+!block
+!integer :: n,i,igen
+!real(prec),allocatable :: eval(:),evec(:,:)
+!real(prec),allocatable :: TMP_S(:,:),TMP_F(:,:) 
+!
+!
+!do igen=1,6
+!
+!   if(allocated(matOne(igen)%Triplet)) then
+!
+!      n=matOne(igen)%Triplet%nbas
+!      call mem_alloc(eval,n)
+!      call mem_alloc(evec,n,n)
+!
+!      call mem_alloc(TMP_S,matOne(igen)%size,matOne(igen)%size)
+!      call mem_alloc(TMP_F,matOne(igen)%size,matOne(igen)%size)
+!      TMP_S = matOne(igen)%matS
+!      TMP_F = matOne(igen)%matF
+!      call shrink_Triplet(TMP_S,matOne(igen)%Triplet)
+!      call shrink_Triplet(TMP_F,matOne(igen)%Triplet)
+!
+!      call symU_diagonalize_qd('QL',n,eval,evec,TMP_F,TMP_S)
+!
+!      write(*,*) 'Shrinked! GenPair',igen
+!      do i=1,n
+!         write(*,*) i,eval(i)
+!      enddo
+!      
+!      call mem_dealloc(eval)
+!      call mem_dealloc(evec)
+!      call mem_dealloc(TMP_S)
+!      call mem_dealloc(TMP_F)
+!
+!   else
+!      n=matOne(igen)%size
+!      call mem_alloc(eval,n)
+!      call mem_alloc(evec,n,n)
+!      
+!      call symU_diagonalize_qd('QL',n,eval,evec,matOne(igen)%matF,matOne(igen)%matS)
+!      
+!      write(*,*) 'GenPair',igen
+!      do i=1,n
+!         write(*,*) i,eval(i)
+!      enddo
+!      
+!      call mem_dealloc(eval)
+!      call mem_dealloc(evec)
+!   endif
 !enddo
-!write(*,*) tmp2
+!
+!end block
 
-!do i=1,nbas(4)+nbas(5)
-!      write(*,*) i,i,matF(6)%matOne(i,i)
-!enddo
+   call free_Triplet(matOne(2)%Triplet)
+   deallocate(matOne(2)%Triplet)
 
-
-! hapka: before eigenvalues test and shinking!
+! HAPKA: HERE END 2-el PART!
+!
 !
 ! hapka: old_drake 
 !   call CCint2_matS('A',0,TMP,PairSystem,PairSystem)
@@ -1587,10 +1627,10 @@ private
 !   call mem_dealloc(matF_S);  call mem_dealloc(matF_T)
 !   call mem_dealloc(matS_S);  call mem_dealloc(matS_T)
     do igen=1,System%NumGen+1
-       call mem_dealloc(matS(igen)%matOne)
-       call mem_dealloc(matF(igen)%matOne)
+       call mem_dealloc(matOne(igen)%matS)
+       call mem_dealloc(matOne(igen)%matF)
     enddo
-    deallocate(matS,matF)
+    deallocate(matOne)
     call mem_dealloc(norb)
     call mem_dealloc(nbas)
 !    
