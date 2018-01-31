@@ -71,9 +71,7 @@ call read_value_and_advance_line(line,Input%maxl,end_flag)
 
 call read_line(line)
 call read_keyword_and_advance_line(line,'NORB','=')
-!call read_value_and_advance_line(line,Input%norb,end_flag)
 call mem_alloc(Input%norb,Input%maxl+1)
-!read(line, *) (Input%norb(i), i=1,Input%maxl+1)
 call read_norbs(line,Input%maxl+1,Input%norb,icnt)
 
 if(icnt.lt.Input%maxl+1) then

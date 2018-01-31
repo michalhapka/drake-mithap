@@ -104,8 +104,6 @@ do j_prim=1,jOrbSystem%n_prim
         iexp = iOrbSpec%iexp
         jexp = jOrbSpec%iexp
 
-      ! write(*,*) iexp,jexp,i_prim,j_prim
-
         ijmin = min(iexp,jexp)
         ijmax = max(iexp,jexp)
 
@@ -308,9 +306,6 @@ do l_prim=1,lOrbSystem%n_prim
                                     offsetTwo_uv + i + j + iOrbl + jOrbl, &
                                     klelms)
 
-!                               write(*,*) matJ(ijpos,klpos),iOrbSpec%offset+i+1,jOrbSpec%offset+j+1, &
-!                                           kOrbSpec%offset+k+1,lOrbSpec%offset+l+1
- 
 !                               matJ(ijpos,klpos) = Two%elms( &
 !                                    offsetTwo_uv + i + j, &
 !                                    klelms)
@@ -344,9 +339,6 @@ do l_prim=1,lOrbSystem%n_prim
                                     prefac*tval%elms( &
                                     klelms, &
                                     offsetTwo_uv + i + j + iOrbl + jOrbl)
-!                               write(*,*) matJ(ijpos,klpos), & 
-!                                          iOrbSpec%offset+i+1,jOrbSpec%offset+j+1, &
-!                                          kOrbSpec%offset+k+1,lOrbSpec%offset+l+1
 
 !                               matJ(ijpos,klpos) = Two%elms( &
 !                                    klelms, &
@@ -472,19 +464,14 @@ do l_prim=1,lOrbSystem%n_prim
                             ijpos = jpos + iOrbSpec%offset
                             jlelms = offsetTwo_uv + j + jOrbl + l + lOrbl
                             do i=0,iOrbSpec%irange
-                               !ilelms = offsetTwo_uv + i + iOrbl + l + lOrbl
                                ijpos = ijpos + 1
 
                                matK(ijpos,klpos) = matK(ijpos,klpos) + &
                                     prefac*tval%elms( &
                                     offsetTwo_uv + i + k + iOrbl + kOrbl, &
-                                    !offsetTwo_uv + j + k + jOrbl + kOrbl, &
-                                    !ilelms)
                                     jlelms)
 
 
-!                               write(*,*) 'O: ', matK(ijpos,klpos), iOrbSpec%offset+i+1,jOrbSpec%offset+j+1, & 
-!                                           kOrbSpec%offset+k+1,lOrbSpec%offset+l+1
 !                               matK(ijpos,klpos) = Two%elms( &
 !                                    offsetTwo_uv + i + k, &
 !                                    jlelms)
@@ -510,17 +497,12 @@ do l_prim=1,lOrbSystem%n_prim
                             ijpos = jpos + iOrbSpec%offset
                             jlelms = offsetTwo_uv + j + jOrbl + l + lOrbl
                             do i=0,iOrbSpec%irange
-                               !ilelms = offsetTwo_uv + i + iOrbl + l + lOrbl
                                ijpos = ijpos + 1
 
                                matK(ijpos,klpos) = matK(ijpos,klpos) + &
                                     prefac*tval%elms(jlelms, &
-                                   ! ilelms, &
-                                   !offsetTwo_uv + j + k + jOrbl + kOrbl)
                                     offsetTwo_uv + i + k + iOrbl + kOrbl)
                                   
-!                               write(*,*) 'U:', matK(ijpos,klpos), iOrbSpec%offset+i+1,jOrbSpec%offset+j+1, & 
-!                                           kOrbSpec%offset+k+1,lOrbSpec%offset+l+1
 
 !                               matK(ijpos,klpos) = Two%elms( &
 !                                    jlelms, &
@@ -1167,10 +1149,7 @@ enddo
               do k=1,size(Two%t_val)
                  associate(tval => Two%t_val(k))
                  if(tval%lambda.gt.0) then
-  !
-  !               offset_uv = -tval%lambda+1
-  !               ijOff = Two%ijrange+offset_uv
-  !               klOff = Two%klrange+offset_uv
+ 
                  last    = shape(tval%elms) 
                  last_ij = last(1)
                  last_kl = last(2)
@@ -1187,15 +1166,6 @@ enddo
                     enddo
                  enddo
   
-  
-  !               if((ijOff.ne.last_ij).and.(klOff.ne.last_kl)) then
-  !                  do i=1,last_kl
-  !                     tval%elms(last_ij,i) = huge(0._prec)
-  !                  enddo
-  !                  do j=1,last_ij
-  !                     tval%elms(j,last_kl) = huge(0._prec)
-  !                  enddo
-  !               endif 
                  endif
                  end associate
               enddo

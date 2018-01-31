@@ -2371,8 +2371,8 @@ integer :: ilam
 integer :: t,pos_t,u,v
 integer :: ctr
 
- !if(LPRINT>=10) then
- if(LPRINT==6) then
+ if(LPRINT>=10) then
+ !if(LPRINT==6) then
  
     write(LOUT,'()')
     write(LOUT,'(5x,a)') '--- CC two-electron integrals ---'
@@ -2395,8 +2395,8 @@ integer :: ctr
                     write(LOUT,'(11x,a,i3,a,3x,a,i3,a,6x,a,2i4)') &
                           'lam = ',ilam,',','t = ',t,',','max_u max_v = ',TwoL%range_uv(:,pos_t)
 ! check ILambda
-!              if(LPRINT>=100) then
-               if(LPRINT>=66) then
+              if(LPRINT>=100) then
+!               if(LPRINT>=6) then
                   associate(&
                        r12       => TwoL%r12(pos_t), &
                        range_uv  => TwoL%range_uv(:,pos_t),&

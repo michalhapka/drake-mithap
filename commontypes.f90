@@ -269,11 +269,6 @@ integer :: NumOrbGen
 real(prec) :: energy
 type(SCForbitalsData_l),allocatable :: SCForb_l(:)
 type(SCForbitalsData_gen),allocatable :: SCForb_gen(:)
-!integer :: norb,nbas
-!real(prec) :: HOMO,LUMO
-!real(prec),allocatable :: orb_energy(:)
-!real(prec),allocatable :: orb_vector(:,:)
-!real(prec),allocatable :: pair_energy(:,:,:)
 end type SCForbitalsData
 
 contains
@@ -383,7 +378,6 @@ endif
 call mem_dealloc(Input%optimized)
 call mem_dealloc(Input%exponents)
 call mem_dealloc(Input%eta)
-! hapka-norg
 call mem_dealloc(Input%norb)
 
 end subroutine free_Input
@@ -739,7 +733,6 @@ if(gen_num==0) then
    key1 = pair1(7)
    key2 = pair2(7)
    if(key1/=key2) then
-! hapka: which command: is "1" ok?
       diff_type = sign(5,key2-key1)
       return
    endif
