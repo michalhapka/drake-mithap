@@ -36,11 +36,17 @@ type int3valData
 real(prec),allocatable :: elms(:,:,:)
 end type int3valData
 
+type J_SpecData_Lam
+logical :: isUsed
+integer :: sum_ij,max_ij,max_k
+end type J_SpecData_Lam
+
 type J_SpecData
 logical :: isUsed
 character(2) :: symbol_ij
 character(1) :: symbol_k
-integer :: sum_ij,max_ij,max_k
+type(J_SpecData_Lam) :: J_SpecLam(0:2)
+!integer :: sum_ij,max_ij,max_k
 end type J_SpecData
 
 type K_SpecData
@@ -75,12 +81,12 @@ int3_source = INT3
 
 call init_ThreeInt(TOTexp,exponents)
 call init_J1_ThreeInt(OrbReduced,PairReduced)
-call init_J2_ThreeInt(OrbReduced,PairReduced)
-call init_K_ThreeInt(OrbReduced,PairReduced)
+!call init_J2_ThreeInt(OrbReduced,PairReduced)
+!call init_K_ThreeInt(OrbReduced,PairReduced)
 
 call print_ThreeInt(LPRINT)
 
-call create_ThreeInt
+!call create_ThreeInt
 
 end subroutine create_CCint3
 
@@ -866,56 +872,141 @@ type(PairReducedData),intent(in) :: PairReduced(:)
 integer :: i_prim,j_prim,i_orb,j_orb
 integer :: sum_12,max_12,max_3
 integer :: iThree,perm1(3),perm2(3),order2(3)
+integer :: igen,jgen,jGenMax
+integer :: ilval, jlval, iadd, nadd
+integer :: add_lval
+integer,allocatable :: jGenNum(:)
+integer :: add_A(2), add_B(2)
 
-!do j_prim=1,size(PairReduced)
-!   do i_prim=1,j_prim
-!      associate(&
-!           iPairSpec => PairReduced(i_prim),&
-!           jPairSpec => PairReduced(j_prim))
-!        if(iPairSpec%isUsed.and.jPairSpec%isUsed) then
+call mem_alloc(jGenNum,2)
+jGenNum = 0
+
+do j_prim=1,size(PairReduced)
+   do i_prim=1,j_prim
+      associate(&
+           iPairSpec => PairReduced(i_prim),&
+           jPairSpec => PairReduced(j_prim))
+        if(iPairSpec%isUsed.and.jPairSpec%isUsed) then
+
+           ! loop over generators
+           do igen=1,iPairSpec%n_gen
+               associate(iPairSpecG => iPairSpec%PairReduced_G(igen),&
+                         iPairGen => iPairSpec%PairReduced_G(igen)%gen_type)
+
+                 call check_gen_pairs(iPairSpecG,jPairSpec,jGenMax,jGenNum)
+                 if(jGenMax.eq.0) cycle
+                 do jgen=1,jGenMax
+                    associate(jPairSpecG => jPairSpec%PairReduced_G(jGenNum(jgen)),&
+                              jPairGen => jPairSpec%PairReduced_G(jGenNum(jgen))%gen_type)
+                             
+                    ! write(*,*) 'iGen:',iPairSpecG%gen_type,'jGen',jPairSpecG%gen_type
 !
-!           do j_orb=1,size(OrbReduced)
-!              do i_orb=1,j_orb
-!                 associate(&
-!                      i_OrbSpec => OrbReduced(i_orb),&
-!                      j_OrbSpec => OrbReduced(j_orb))
-!                   if(i_OrbSpec%isUsed.and.j_OrbSpec%isUsed) then
-!
-!                      sum_12 = &
-!                           maxOmega_PairReduced(iPairSpec) + &
-!                           maxOmega_PairReduced(jPairSpec)
-!
-!                      max_12 = &
-!                           maxt_PairReduced(iPairSpec) + &
-!                           maxt_PairReduced(jPairSpec)
-!
-!                      max_3 = i_OrbSpec%maxrange + j_OrbSpec%maxrange
-!
-!                      order2 = [1,0,0]
-!                      call perm_part1(iThree,perm1,perm2,order2,&
-!                           iPairSpec%iexp1,jPairSpec%iexp1,&
-!                           iPairSpec%iexp2,jPairSpec%iexp2,&
-!                           i_OrbSpec%iexp ,j_OrbSpec%iexp)
-!                      call add_J_Spec(iThree,maxloc(order2,dim=1),&
-!                           sum_12,max_12,max_3)
-!
-!                      order2 = [1,0,0]
-!                      call perm_part1(iThree,perm1,perm2,order2,&
-!                           iPairSpec%iexp1,jPairSpec%iexp2,&
-!                           iPairSpec%iexp2,jPairSpec%iexp1,&
-!                           i_OrbSpec%iexp ,j_OrbSpec%iexp)
-!                      call add_J_Spec(iThree,maxloc(order2,dim=1),&
-!                           sum_12,max_12,max_3)
-!
-!                   endif
-!                 end associate
-!              enddo
-!           enddo
-!
-!        endif
-!      end associate
-!   enddo
-!enddo
+                   do j_orb=1,size(OrbReduced)
+                      do i_orb=1,j_orb
+                         associate(&
+                              i_OrbSpec => OrbReduced(i_orb),&
+                              j_OrbSpec => OrbReduced(j_orb))
+                           if(i_OrbSpec%isUsed.and.j_OrbSpec%isUsed) then
+
+                              do ilval=1,i_OrbSpec%nlang
+                                 do jlval=1,j_OrbSpec%nlang
+
+                                    if(j_OrbSpec%lang(jlval).eq.i_OrbSpec%lang(ilval)) then
+                                      ! print*, i_OrbSpec%lang(ilval), j_OrbSpec%lang(jlval)
+
+                                      add_A = 0
+                                      add_B = 0 
+                                      if(iPairGen==jPairGen) then
+                                         select case(iPairGen)
+                                         case(1)   !S^e
+                                            nadd     = 1
+                                            add_A(1) = 0 
+                                            add_B(1) = 0 
+                                            add_lval = 0
+                                         case(2)   !P^o
+                                            nadd     = 1
+                                            add_A(1) = 0
+                                            add_B(1) = 1
+                                            add_lval = 2
+                                         case(3,4) !P^e, D(1)
+                                            nadd     = 2
+                                            add_A(1) = 0
+                                            add_A(2) = 2
+                                            add_B(1) = 0
+                                            add_B(2) = 2
+                                            add_lval = 4
+                                         case(5)   !D(2)
+                                            nadd     = 1
+                                            add_A(1) = 0
+                                            add_B(1) = 2
+                                            add_lval = 4
+                                         case default
+                                            write(LOUT,'(a)') 'ERROR! Wrong generator!'
+                                         end select
+                                      else
+                                         select case(iPairGen)
+                                         case(4,5)
+                                            nadd     = 1
+                                            add_A(1) = 1
+                                            add_B(1) = 1
+                                            add_lval = 4
+                                         end select
+                                      endif
+
+                                      sum_12 = &
+                                             maxOmega_PairReduced(iPairSpecG) + &
+                                             maxOmega_PairReduced(jPairSpecG) + &
+                                             add_lval 
+
+                                       max_12 = &
+                                              maxt_PairReduced(iPairSpecG) + &
+                                              maxt_PairReduced(jPairSpecG)
+
+                                     ! max_3 = i_OrbSpec%maxrange + j_OrbSpec%maxrange
+                                       max_3 = & 
+                                             i_OrbSpec%max_lrange(ilval) + &
+                                             j_OrbSpec%max_lrange(jlval)
+
+                                       ! A-part
+                                       order2 = [1,0,0]
+                                       call perm_part1(iThree,perm1,perm2,order2,&
+                                            iPairSpec%iexp1,jPairSpec%iexp1,&
+                                            iPairSpec%iexp2,jPairSpec%iexp2,&
+                                            i_OrbSpec%iexp ,j_OrbSpec%iexp)
+                                       do iadd=1,nadd     
+                                          call add_J_Spec(iThree,add_A(iadd),maxloc(order2,dim=1),&
+                                               sum_12-2*add_A(iadd),max_12,max_3)
+                                       enddo 
+
+                                       ! B-part
+                                       order2 = [1,0,0]
+                                       call perm_part1(iThree,perm1,perm2,order2,&
+                                            iPairSpec%iexp1,jPairSpec%iexp2,&
+                                            iPairSpec%iexp2,jPairSpec%iexp1,&
+                                            i_OrbSpec%iexp ,j_OrbSpec%iexp)
+                                       do iadd=1,nadd     
+                                          call add_J_Spec(iThree,add_B(iadd),maxloc(order2,dim=1),&
+                                               sum_12-2*add_B(iadd),max_12,max_3)
+                                       enddo
+
+                                    endif
+                                 enddo
+                              enddo
+
+                               endif
+                             end associate
+                          enddo
+                       enddo
+                   end associate
+                 enddo
+              end associate
+           enddo
+        endif
+      end associate
+   enddo
+enddo
+
+call mem_dealloc(jGenNum)
 
 end subroutine init_J1_ThreeInt
 
@@ -1064,10 +1155,12 @@ integer :: iThree,perm1(3),perm2(3),order2(3)
 
 end subroutine init_K_ThreeInt
 
-subroutine add_J_Spec(iThree,ij,sum_ij,max_ij,max_k)
+subroutine add_J_Spec(iThree,lambda,ij,sum_ij,max_ij,max_k)
 implicit none
 integer,intent(in) :: iThree,ij
+integer,intent(in) :: lambda
 integer,intent(in) :: sum_ij,max_ij,max_k
+integer :: ival,lval
 
 associate(Three => ThreeInt(iThree))
 
@@ -1075,22 +1168,60 @@ associate(Three => ThreeInt(iThree))
 
      allocate(Three%J_Spec(3))
 
-     Three%J_Spec(1) = J_SpecData(.false.,'12','3',0,0,0)
-     Three%J_Spec(2) = J_SpecData(.false.,'13','2',0,0,0)
-     Three%J_Spec(3) = J_SpecData(.false.,'23','1',0,0,0)
+! hapka: old_drake
+!     Three%J_Spec(1) = J_SpecData(.false.,'12','3',0,0,0)
+!     Three%J_Spec(2) = J_SpecData(.false.,'13','2',0,0,0)
+!     Three%J_Spec(3) = J_SpecData(.false.,'23','1',0,0,0)
+
+     ! initialize
+     do ival=1,size(Three%J_Spec)
+        associate(Spec => Three%J_Spec(ival))
+         
+          ! init JSpec
+          Spec%isUsed = .false.
+          select case(ival)
+          case(1)
+             Spec%symbol_ij = '12'
+             Spec%symbol_k  = '3'
+          case(2)
+             Spec%symbol_ij = '13'
+             Spec%symbol_k  = '2'
+          case(3)
+             Spec%symbol_ij = '23'
+             Spec%symbol_k  = '1' 
+          end select
+
+          ! init JSpecLam
+          do lval=0,2
+             associate(LSpec => Spec%J_SpecLam(lval))
+
+               LSpec%isUsed = .false.
+               LSpec%sum_ij = 0 
+               LSpec%max_ij = 0 
+               LSpec%max_k  = 0 
+
+             end associate
+          enddo
+
+        end associate
+     enddo
 
      Three%isUsed_J = .true.
 
   endif
 
   associate(Spec => Three%J_Spec(ij))
+    associate(LSpec => Spec%J_SpecLam(lambda))
 
-    Spec%sum_ij = max(Spec%sum_ij,sum_ij)
-    Spec%max_ij = max(Spec%max_ij,max_ij)
-    Spec%max_k  = max(Spec%max_k ,max_k)
+      LSpec%sum_ij = max(LSpec%sum_ij,sum_ij)
+      LSpec%max_ij = max(LSpec%max_ij,max_ij)
+      LSpec%max_k  = max(LSpec%max_k ,max_k)
+
+      LSpec%isUsed = .true. 
+      
+    end associate
 
     Spec%isUsed = .true.
-
   end associate
 
 end associate
@@ -1363,149 +1494,149 @@ character(name_length) :: name_J1,name_J2,name_K0,name_K1
 
 call execute_command_line('rm -f '//core_J//'* '//core_K//'*')
 
-select case(int3_source)
-case('L')
-
-   do iThree=1,size(ThreeInt)
-      associate(Three => ThreeInt(iThree))
-
-        if(Three%isUsed_J) then
-           do ij=1,3
-              associate(Spec => Three%J_Spec(ij))
-                if(Spec%isUsed) then
-
-                   name_J1 = prepare_name(core_J,iThree,ij,1)
-                   name_J2 = prepare_name(core_J,iThree,ij,2)
-
-                   perm1 = [1,2,3]
-                   perm2 = [1,2,3]
-                   order2 = 0
-                   order2(ij) = 1
-                   call perm_part2(perm1,perm2,order2)
-                   alpha = permuted_alpha(Three,perm1)
-
-                   open(newunit=iunit,file=infile)
-                   write(iunit,'(3es23.15,2x,a1,2x,3i5)') alpha,'J',&
-                        Spec%sum_ij,Spec%max_ij,Spec%max_k
-                   close(iunit)
-                   call execute_command_line(&
-                        'bash '//script//' L '//infile//' J '//trim(name_J1))
-
-                   if(permuted_same12(Three,perm2)) then
-
-                      call execute_command_line('cp '//&
-                           trim(name_J1)//' '//trim(name_J2))
-
-                   else
-
-                      call swap(alpha(1),alpha(2))
-
-                      open(newunit=iunit,file=infile)
-                      write(iunit,'(3es23.15,2x,a1,2x,3i5)') alpha,'J',&
-                           Spec%sum_ij,Spec%max_ij,Spec%max_k
-                      close(iunit)
-                      call execute_command_line(&
-                           'bash '//script//' L '//infile//' J '//trim(name_J2))
-
-                   endif
-
-                endif
-              end associate
-           enddo
-        endif
-
-        if(Three%isUsed_K) then
-           do ij=1,3
-              associate(Spec => Three%K_Spec(ij))
-                if(Spec%isUsed) then
-
-                   name_K0 = prepare_name(core_K,iThree,ij,0)
-                   name_K1 = prepare_name(core_K,iThree,ij,1)
-
-                   perm1 = [1,2,3]
-                   perm2 = [1,2,3]
-                   order2 = 0
-                   order2(ij) = -1
-                   call perm_part2(perm1,perm2,order2)
-                   alpha = permuted_alpha(Three,perm1)
-
-                   open(newunit=iunit,file=infile)
-                   write(iunit,'(3es23.15,2x,a1,2x,3i5)') alpha,'K',&
-                        Spec%sum_TOT,Spec%max_2,Spec%max_1
-                   close(iunit)
-                   call execute_command_line(&
-                        'bash '//script//' L '//infile//' K '//&
-                        trim(name_K0)//' '//trim(name_K1))
-
-                endif
-              end associate
-           enddo
-        endif
-
-      end associate
-   enddo
-
-case('P','Q')
-
-   do iThree=1,size(ThreeInt)
-      associate(Three => ThreeInt(iThree))
-
-        open(newunit=iunit,file=infile)
-        write(iunit,'(3es23.15)') Three%ijalpha,Three%klalpha,Three%mnalpha
-
-        if(Three%isUsed_J) then
-           write(iunit,'(i1)') count(Three%J_Spec(:)%isUsed)
-           do ij=1,3
-              associate(Spec => Three%J_Spec(ij))
-                if(Spec%isUsed) then
-
-                   name_J1 = prepare_name(core_J,iThree,ij,1)
-                   name_J2 = prepare_name(core_J,iThree,ij,2)
-
-                   write(iunit,'(a2,2x,3i5,2(2x,a))') Spec%symbol_ij,&
-                        Spec%sum_ij,Spec%max_ij,Spec%max_k,&
-                        trim(name_J1),trim(name_J2)
-
-                endif
-              end associate
-           enddo
-        else
-           write(iunit,'(i1)') 0
-        endif
-
-        if(Three%isUsed_K) then
-           write(iunit,'(i1)') count(Three%K_Spec(:)%isUsed)
-           do ij=1,3
-              associate(Spec => Three%K_Spec(ij))
-                if(Spec%isUsed) then
-
-                   name_K0 = prepare_name(core_K,iThree,ij,0)
-                   name_K1 = prepare_name(core_K,iThree,ij,1)
-
-                   write(iunit,'(a2,2x,3i5,2(2x,a))') Spec%symbol_ij,&
-                        Spec%sum_TOT,Spec%max_2,Spec%max_1,&
-                        trim(name_K0),trim(name_K1)
-
-                endif
-              end associate
-           enddo
-        else
-           write(iunit,'(i1)') 0
-        endif
-
-        close(iunit)
-        call execute_command_line(&
-             'bash '//script//' '//int3_source//' '//infile)
-
-      end associate
-   enddo
-
-case default
-
-   write(LOUT,'(a)') 'ERROR!!! Unrecognizable source of 3-el integrals!'
-   stop
-
-end select
+!select case(int3_source)
+!case('L')
+!
+!   do iThree=1,size(ThreeInt)
+!      associate(Three => ThreeInt(iThree))
+!
+!        if(Three%isUsed_J) then
+!           do ij=1,3
+!              associate(Spec => Three%J_Spec(ij))
+!                if(Spec%isUsed) then
+!
+!                   name_J1 = prepare_name(core_J,iThree,ij,1)
+!                   name_J2 = prepare_name(core_J,iThree,ij,2)
+!
+!                   perm1 = [1,2,3]
+!                   perm2 = [1,2,3]
+!                   order2 = 0
+!                   order2(ij) = 1
+!                   call perm_part2(perm1,perm2,order2)
+!                   alpha = permuted_alpha(Three,perm1)
+!
+!                   open(newunit=iunit,file=infile)
+!                   write(iunit,'(3es23.15,2x,a1,2x,3i5)') alpha,'J',&
+!                        Spec%sum_ij,Spec%max_ij,Spec%max_k
+!                   close(iunit)
+!                   call execute_command_line(&
+!                        'bash '//script//' L '//infile//' J '//trim(name_J1))
+!
+!                   if(permuted_same12(Three,perm2)) then
+!
+!                      call execute_command_line('cp '//&
+!                           trim(name_J1)//' '//trim(name_J2))
+!
+!                   else
+!
+!                      call swap(alpha(1),alpha(2))
+!
+!                      open(newunit=iunit,file=infile)
+!                      write(iunit,'(3es23.15,2x,a1,2x,3i5)') alpha,'J',&
+!                           Spec%sum_ij,Spec%max_ij,Spec%max_k
+!                      close(iunit)
+!                      call execute_command_line(&
+!                           'bash '//script//' L '//infile//' J '//trim(name_J2))
+!
+!                   endif
+!
+!                endif
+!              end associate
+!           enddo
+!        endif
+!
+!        if(Three%isUsed_K) then
+!           do ij=1,3
+!              associate(Spec => Three%K_Spec(ij))
+!                if(Spec%isUsed) then
+!
+!                   name_K0 = prepare_name(core_K,iThree,ij,0)
+!                   name_K1 = prepare_name(core_K,iThree,ij,1)
+!
+!                   perm1 = [1,2,3]
+!                   perm2 = [1,2,3]
+!                   order2 = 0
+!                   order2(ij) = -1
+!                   call perm_part2(perm1,perm2,order2)
+!                   alpha = permuted_alpha(Three,perm1)
+!
+!                   open(newunit=iunit,file=infile)
+!                   write(iunit,'(3es23.15,2x,a1,2x,3i5)') alpha,'K',&
+!                        Spec%sum_TOT,Spec%max_2,Spec%max_1
+!                   close(iunit)
+!                   call execute_command_line(&
+!                        'bash '//script//' L '//infile//' K '//&
+!                        trim(name_K0)//' '//trim(name_K1))
+!
+!                endif
+!              end associate
+!           enddo
+!        endif
+!
+!      end associate
+!   enddo
+!
+!case('P','Q')
+!
+!   do iThree=1,size(ThreeInt)
+!      associate(Three => ThreeInt(iThree))
+!
+!        open(newunit=iunit,file=infile)
+!        write(iunit,'(3es23.15)') Three%ijalpha,Three%klalpha,Three%mnalpha
+!
+!        if(Three%isUsed_J) then
+!           write(iunit,'(i1)') count(Three%J_Spec(:)%isUsed)
+!           do ij=1,3
+!              associate(Spec => Three%J_Spec(ij))
+!                if(Spec%isUsed) then
+!
+!                   name_J1 = prepare_name(core_J,iThree,ij,1)
+!                   name_J2 = prepare_name(core_J,iThree,ij,2)
+!
+!                   write(iunit,'(a2,2x,3i5,2(2x,a))') Spec%symbol_ij,&
+!                        Spec%sum_ij,Spec%max_ij,Spec%max_k,&
+!                        trim(name_J1),trim(name_J2)
+!
+!                endif
+!              end associate
+!           enddo
+!        else
+!           write(iunit,'(i1)') 0
+!        endif
+!
+!        if(Three%isUsed_K) then
+!           write(iunit,'(i1)') count(Three%K_Spec(:)%isUsed)
+!           do ij=1,3
+!              associate(Spec => Three%K_Spec(ij))
+!                if(Spec%isUsed) then
+!
+!                   name_K0 = prepare_name(core_K,iThree,ij,0)
+!                   name_K1 = prepare_name(core_K,iThree,ij,1)
+!
+!                   write(iunit,'(a2,2x,3i5,2(2x,a))') Spec%symbol_ij,&
+!                        Spec%sum_TOT,Spec%max_2,Spec%max_1,&
+!                        trim(name_K0),trim(name_K1)
+!
+!                endif
+!              end associate
+!           enddo
+!        else
+!           write(iunit,'(i1)') 0
+!        endif
+!
+!        close(iunit)
+!        call execute_command_line(&
+!             'bash '//script//' '//int3_source//' '//infile)
+!
+!      end associate
+!   enddo
+!
+!case default
+!
+!   write(LOUT,'(a)') 'ERROR!!! Unrecognizable source of 3-el integrals!'
+!   stop
+!
+!end select
 
 end subroutine create_ThreeInt
 
@@ -1527,28 +1658,28 @@ real(prec) :: val4
 integer :: i1,i2,i3,i12
 procedure(),pointer :: permute_indices
 
-if(.not.ThreeInt(iThree)%isUsed_J) then
-   write(LOUT,'(a)') 'ERROR!!! &
-        &An entry incorrectly predicted as not necessary for J integrals!'
-   stop
-endif
-associate(Spec => ThreeInt(iThree)%J_Spec(ij))
-  if(.not.Spec%isUsed) then
-     write(LOUT,'(a)') 'ERROR!!! &
-          &An ordering incorrectly predicted as not necessary for J integrals!'
-     stop
-  endif
-  if(sum_12>Spec%sum_ij.or.max_12>Spec%max_ij.or.max_3>Spec%max_k) then
-     write(LOUT,'(a)') 'ERROR!!! &
-          &Ranges of 3-electron J integrals have been predicted incorrectly!'
-     stop
-  endif
-end associate
-if(perm1(3)/=3.or.perm2(1)/=1.or.&
-     (perm1(1)<perm1(2)).neqv.(perm2(2)<perm2(3))) then
-   write(LOUT,'(a)') 'ERROR!!! Unexpected permutation for J integrals!'
-   stop
-endif
+!if(.not.ThreeInt(iThree)%isUsed_J) then
+!   write(LOUT,'(a)') 'ERROR!!! &
+!        &An entry incorrectly predicted as not necessary for J integrals!'
+!   stop
+!endif
+!associate(Spec => ThreeInt(iThree)%J_Spec(ij))
+!  if(.not.Spec%isUsed) then
+!     write(LOUT,'(a)') 'ERROR!!! &
+!          &An ordering incorrectly predicted as not necessary for J integrals!'
+!     stop
+!  endif
+!  if(sum_12>Spec%sum_ij.or.max_12>Spec%max_ij.or.max_3>Spec%max_k) then
+!     write(LOUT,'(a)') 'ERROR!!! &
+!          &Ranges of 3-electron J integrals have been predicted incorrectly!'
+!     stop
+!  endif
+!end associate
+!if(perm1(3)/=3.or.perm2(1)/=1.or.&
+!     (perm1(1)<perm1(2)).neqv.(perm2(2)<perm2(3))) then
+!   write(LOUT,'(a)') 'ERROR!!! Unexpected permutation for J integrals!'
+!   stop
+!endif
 
 select case(extra)
 case(1)
@@ -1885,7 +2016,7 @@ integer :: iThree
 do iThree=1,size(ThreeInt)
    associate(Three => ThreeInt(iThree))
 
-     if(Three%isUsed_K) deallocate(Three%K_Spec)
+!     if(Three%isUsed_K) deallocate(Three%K_Spec)
      if(Three%isUsed_J) deallocate(Three%J_Spec)
 
    end associate
@@ -1899,8 +2030,9 @@ subroutine print_ThreeInt(LPRINT)
 implicit none
 integer,intent(in) :: LPRINT
 integer :: iThree,ij
+integer :: ilam
 
-if(LPRINT>=10) then
+!if(LPRINT>=10) then
 
    write(LOUT,'()')
    write(LOUT,'(5x,a)') '--- CC three-electron integrals ---'
@@ -1926,29 +2058,44 @@ if(LPRINT>=10) then
               do ij=1,3
                  associate(Spec => Three%J_Spec(ij))
                    if(Spec%isUsed) then
-                      write(LOUT,'(12x,2a,2(2x,3a,i3),2x,3a,i3)') &
-                           'symbol:',Spec%symbol_ij,&
-                           'sum_',Spec%symbol_ij,'  = ',Spec%sum_ij,&
-                           'max_',Spec%symbol_ij,' = ',Spec%max_ij,&
-                           'max_',Spec%symbol_k,' = ',Spec%max_k
+!                      write(LOUT,'(12x,2a,2(2x,3a,i3),2x,3a,i3)') &
+                      write(LOUT,'(12x,2a)') &
+                           'symbol:',Spec%symbol_ij
+                      do ilam=0,2
+                         associate(LSpec => Spec%J_SpecLam(ilam))
+                           if(LSpec%isUsed) then
+                           write(LOUT,'(12x,a,i3,3(2x,3a,i3))') &
+                           'ilam = ',ilam, & 
+                           'sum_',Spec%symbol_ij,'  = ',LSpec%sum_ij,&
+                           'max_',Spec%symbol_ij,' = ',LSpec%max_ij,&
+                           'max_',Spec%symbol_k,' = ',LSpec%max_k
+
+!                      write(LOUT,'(12x,2a,2(2x,3a,i3),2x,3a,i3)') &
+!                           'symbol:',Spec%symbol_ij ,&
+!                           'sum_',Spec%symbol_ij,'  = ',Spec%sum_ij,&
+!                           'max_',Spec%symbol_ij,' = ',Spec%max_ij,&
+!                           'max_',Spec%symbol_k,' = ',Spec%max_k
+                           endif
+                         end associate
+                      enddo
                    endif
                  end associate
               enddo
            endif
-           if(Three%isUsed_K) then
-              write(LOUT,'(8x,a,i1)') 'K: ',count(Three%K_Spec(:)%isUsed)
-              do ij=1,3
-                 associate(Spec => Three%K_Spec(ij))
-                   if(Spec%isUsed) then
-                      write(LOUT,'(12x,2a,3(2x,a,i3))') &
-                           'symbol:',Spec%symbol_ij,&
-                           'sum_TOT = ',Spec%sum_TOT,&
-                           'max_ij = ',Spec%max_2,&
-                           'max_i = ',Spec%max_1
-                   endif
-                 end associate
-              enddo
-           endif
+!           if(Three%isUsed_K) then
+!              write(LOUT,'(8x,a,i1)') 'K: ',count(Three%K_Spec(:)%isUsed)
+!              do ij=1,3
+!                 associate(Spec => Three%K_Spec(ij))
+!                   if(Spec%isUsed) then
+!                      write(LOUT,'(12x,2a,3(2x,a,i3))') &
+!                           'symbol:',Spec%symbol_ij,&
+!                           'sum_TOT = ',Spec%sum_TOT,&
+!                           'max_ij = ',Spec%max_2,&
+!                           'max_i = ',Spec%max_1
+!                   endif
+!                 end associate
+!              enddo
+!           endif
            write(LOUT,'()')
         else
            write(LOUT,'(a)') 'NOT USED'
@@ -1956,7 +2103,7 @@ if(LPRINT>=10) then
       end associate
    enddo
 
-endif
+!endif
 
 end subroutine print_ThreeInt
 

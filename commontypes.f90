@@ -1651,25 +1651,25 @@ end subroutine check_consistency_PairReduced
 function maxOmega_PairReduced(PairReduced) result(Omega)
 implicit none
 integer :: Omega
-type(PairReducedData),intent(in) :: PairReduced
+type(PairReducedData_G),intent(in) :: PairReduced
 integer :: i
 
 Omega = 0
 
-!if(PairReduced%istype1) &
-!     Omega = max(Omega,PairReduced%maxrange1)
-!
-!if(PairReduced%istype2) then
-!   do i=1,PairReduced%n_range2
-!      Omega = max(Omega,sum(PairReduced%maxrange2(1:2,i)))
-!   enddo
-!endif
-!
-!if(PairReduced%istype3) then
-!   do i=1,PairReduced%n_range3
-!      Omega = max(Omega,sum(PairReduced%maxrange3(1:3,i)))
-!   enddo
-!endif
+if(PairReduced%istype1) &
+     Omega = max(Omega,PairReduced%maxrange1)
+
+if(PairReduced%istype2) then
+   do i=1,PairReduced%n_range2
+      Omega = max(Omega,sum(PairReduced%maxrange2(1:2,i)))
+   enddo
+endif
+
+if(PairReduced%istype3) then
+   do i=1,PairReduced%n_range3
+      Omega = max(Omega,sum(PairReduced%maxrange3(1:3,i)))
+   enddo
+endif
 
 end function maxOmega_PairReduced
 

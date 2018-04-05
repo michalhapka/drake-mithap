@@ -654,9 +654,8 @@ private
 !      call timer('2-el integrals use',Tcpu,Twall)
 !      flush(LOUT)
 !   endif
-! 
-!   call create_CCint3(Nexp,exponents,System%OrbReduced,System%PairReduced,&
-!        Control%INT3,LPRINT)
+   call create_CCint3(Nexp,exponents,System%OrbReduced,System%PairReduced,&
+        Control%INT3,LPRINT)
 !   if(fullPRINT) then
 !      call timer('3-el integrals init',Tcpu,Twall)
 !      flush(LOUT)
@@ -802,7 +801,7 @@ private
 !      enddo
 !   enddo
 ! 
-!   call free_CCint3
+   call free_CCint3
 !   if(fullPRINT) then
 !      call timer('3-el integrals use',Tcpu,Twall)
 !      flush(LOUT)
