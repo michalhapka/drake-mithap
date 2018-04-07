@@ -49,10 +49,16 @@ type(J_SpecData_Lam) :: J_SpecLam(0:2)
 !integer :: sum_ij,max_ij,max_k
 end type J_SpecData
 
+type K_SpecData_Lam
+logical :: isUsed
+integer :: sum_TOT,max_2,max_1
+end type K_SpecData_Lam
+
 type K_SpecData
 logical :: isUsed
 character(2) :: symbol_ij
-integer :: sum_TOT,max_2,max_1
+type(K_SpecData_Lam) :: K_SpecLam(0:3,0:3,0:3)
+!integer :: sum_TOT,max_2,max_1
 end type K_SpecData
 
 type ThreeIntData
@@ -82,7 +88,7 @@ int3_source = INT3
 call init_ThreeInt(TOTexp,exponents)
 call init_J1_ThreeInt(OrbReduced,PairReduced)
 !call init_J2_ThreeInt(OrbReduced,PairReduced)
-!call init_K_ThreeInt(OrbReduced,PairReduced)
+call init_K_ThreeInt(OrbReduced,PairReduced)
 
 call print_ThreeInt(LPRINT)
 
@@ -1078,80 +1084,353 @@ type(PairReducedData),intent(in) :: PairReduced(:)
 integer :: i_prim,j_prim,i_orb,j_orb
 integer :: imax,jmax,sum_TOT,max_2,max_1
 integer :: iThree,perm1(3),perm2(3),order2(3)
+integer :: igen,jgen,jGenMax
+integer,allocatable :: jGenNum(:)
+integer :: iadd, ilval, jlval
+integer :: add_lval, ilmax, jlmax
+integer :: naddA1,naddA2,naddB1,naddB2
+integer :: add_A1(3,5), add_A2(3,5)
+integer :: add_B1(3,5), add_B2(3,5)
 
-!do j_prim=1,size(PairReduced)
-!   do i_prim=1,j_prim
-!      associate(&
-!           iPairSpec => PairReduced(i_prim),&
-!           jPairSpec => PairReduced(j_prim))
-!        if(iPairSpec%isUsed.and.jPairSpec%isUsed) then
+call mem_alloc(jGenNum,2)
+jGenNum = 0
+
+do j_prim=1,size(PairReduced)
+   do i_prim=1,j_prim
+      associate(&
+           iPairSpec => PairReduced(i_prim),&
+           jPairSpec => PairReduced(j_prim))
+        if(iPairSpec%isUsed.and.jPairSpec%isUsed) then
+
+           ! loop over generators
+           do igen=1,iPairSpec%n_gen
+              associate(iPairSpecG => iPairSpec%PairReduced_G(igen),&
+                        iPairGen => iPairSpec%PairReduced_G(igen)%gen_type)
+
+                 call check_gen_pairs(iPairSpecG,jPairSpec,jGenMax,jGenNum)
+                 if(jGenMax.eq.0) cycle
+                 do jgen=1,jGenMax
+                    associate(jPairSpecG => jPairSpec%PairReduced_G(jGenNum(jgen)),&
+                              jPairGen => jPairSpec%PairReduced_G(jGenNum(jgen))%gen_type)
 !
-!           do j_orb=1,size(OrbReduced)
-!              do i_orb=1,size(OrbReduced)
-!                 associate(&
-!                      i_OrbSpec => OrbReduced(i_orb),&
-!                      j_OrbSpec => OrbReduced(j_orb))
-!                   if(i_OrbSpec%isUsed.and.j_OrbSpec%isUsed) then
+                   do j_orb=1,size(OrbReduced)
+                      do i_orb=1,size(OrbReduced)
+                         associate(&
+                              i_OrbSpec => OrbReduced(i_orb),&
+                              j_OrbSpec => OrbReduced(j_orb))
+                           if(i_OrbSpec%isUsed.and.j_OrbSpec%isUsed) then
+
+                              do ilval=1,i_OrbSpec%nlang
+                                 do jlval=1,j_OrbSpec%nlang
+
+                                    if(j_OrbSpec%lang(jlval).eq.i_OrbSpec%lang(ilval)) then
+
+                                      add_A1 = 0; add_A2 = 0
+                                      add_B1 = 0; add_B2 = 0 
+                                      if(iPairGen==jPairGen) then
+                                         select case(iPairGen)
+                                         case(1)   !S^e
+
+                                            add_lval = 0
+                                            ilmax    = 0 
+                                            jlmax    = 0
+                                            if(i_OrbSpec%lang(ilval).eq.0) then
+                                               ! K1
+                                               naddA1      = 1
+                                               naddB1      = 1
+                                               add_A1(:,1) = [0,0,0]
+                                               add_B1(:,1) = [0,0,0]
+                                               ! K2
+                                               naddA2      = 1
+                                               naddB2      = 1
+                                               add_A2(:,1) = [0,0,0]
+                                               add_B2(:,1) = [0,0,0]
+                                            elseif(i_OrbSpec%lang(ilval).eq.1) then
+                                               ! K1
+                                               naddA1      = 1
+                                               naddB1      = 1
+                                               add_A1(:,1) = [1,0,1]
+                                               add_B1(:,1) = [1,0,1]
+                                               ! K2
+                                               naddA2      = 1
+                                               naddB2      = 1
+                                               add_A2(:,1) = [0,1,1] 
+                                               add_B2(:,1) = [0,1,1]
+                                            endif
+
+                                         case(2)   !P^o
+
+                                            add_lval = 2
+                                            ilmax    = 1 
+                                            jlmax    = 1
+                                            if(i_OrbSpec%lang(ilval).eq.0) then
+                                               ! K1
+                                               naddA1      = 1
+                                               naddB1      = 1
+                                               add_A1(:,1) = [0,0,0]
+                                               add_B1(:,1) = [0,1,1]
+                                               ! K2
+                                               naddA2      = 1
+                                               naddB2      = 1
+                                               add_A2(:,1) = [0,1,1]
+                                               add_B2(:,1) = [1,1,0]
+ 
+                                            elseif(i_OrbSpec%lang(ilval).eq.1) then
+                                               ! K1
+                                               naddA1      = 1
+                                               naddB1      = 2
+                                               add_A1(:,1) = [1,0,1]
+                                               add_B1(:,1) = [1,1,0]
+                                               add_B1(:,2) = [1,1,2]
+                                               ! K2
+                                               naddA2      = 2
+                                               naddB2      = 2
+                                               add_A2(:,1) = [0,0,0]
+                                               add_A2(:,2) = [0,2,2]
+                                               add_B2(:,1) = [1,0,1]
+                                               add_B2(:,2) = [1,2,1]
+
+                                            endif
+
+                                         case(3,4) !P^e,D(1)
+
+                                            add_lval = 4
+                                            ilmax    = 1 
+                                            jlmax    = 1
+                                            if(i_OrbSpec%lang(ilval).eq.0) then
+                                               ! K1
+                                               naddA1      = 2
+                                               naddB1      = 2
+                                               add_A1(:,1) = [1,0,1]
+                                               add_A1(:,2) = [1,2,1]
+                                               add_B1(:,1) = [1,0,1]
+                                               add_B1(:,2) = [1,2,1]
+                                               ! K2
+                                               naddA1      = 2
+                                               naddB1      = 2
+                                               add_A1(:,1) = [0,1,1]
+                                               add_A1(:,2) = [2,1,1]
+                                               add_B1(:,1) = [0,1,1]
+                                               add_B1(:,2) = [2,1,1]
+
+                                            elseif(i_OrbSpec%lang(ilval).eq.1) then
+                                               ! K1
+                                               naddA1      = 5
+                                               naddB1      = 5
+                                               add_A1(:,1) = [0,0,0]
+                                               add_A1(:,2) = [0,2,2]
+                                               add_A1(:,3) = [2,0,2]
+                                               add_A1(:,4) = [2,2,0]
+                                               add_A1(:,5) = [2,2,2]
+                                               add_B1(:,1) = [0,0,0]
+                                               add_B1(:,2) = [0,2,2]
+                                               add_B1(:,3) = [2,0,2]
+                                               add_B1(:,4) = [2,2,0]
+                                               add_B1(:,5) = [2,2,2]
+                                               ! K2
+                                               naddA2      = 5
+                                               naddB2      = 5
+                                               add_A2(:,1) = [0,0,0]
+                                               add_A2(:,2) = [0,2,2]
+                                               add_A2(:,3) = [2,0,2]
+                                               add_A2(:,4) = [2,2,0]
+                                               add_A2(:,5) = [2,2,2]
+                                               add_B2(:,1) = [0,0,0]
+                                               add_B2(:,2) = [0,2,2]
+                                               add_B2(:,3) = [2,0,2]
+                                               add_B2(:,4) = [2,2,0]
+                                               add_B2(:,5) = [2,2,2]
+
+                                            endif
+
+                                         case(5)   !D(2)
+
+                                            add_lval = 4
+                                            ilmax    = 2 
+                                            jlmax    = 2
+                                            if(i_OrbSpec%lang(ilval).eq.0) then
+                                               ! K1
+                                               naddA1      = 1
+                                               naddB1      = 1
+                                               add_A1(:,1) = [0,0,0]
+                                               add_B1(:,1) = [0,2,2]
+                                               ! K2
+                                               naddA2      = 1
+                                               naddB2      = 1
+                                               add_A2(:,1) = [0,2,2]
+                                               add_B2(:,1) = [2,2,0]
+ 
+                                            elseif(i_OrbSpec%lang(ilval).eq.1) then
+                                               ! K1
+                                               naddA1      = 1
+                                               naddB1      = 2
+                                               add_A1(:,1) = [1,0,1]
+                                               add_B1(:,1) = [1,2,1]
+                                               add_B1(:,2) = [1,2,3]
+                                               ! K2
+                                               naddA2      = 2
+                                               naddB2      = 2
+                                               add_A2(:,1) = [0,1,1]
+                                               add_A2(:,2) = [0,3,3]
+                                               add_B2(:,1) = [2,1,1]
+                                               add_B2(:,2) = [2,3,1]
+
+                                            endif
+
+                                         case default
+                                            write(LOUT,'(a)') 'ERROR! Wrong generator!'
+                                         end select
+                                      else !odd generators
+                                         select case(iPairGen)
+                                         case(4,5)
+
+                                            add_lval = 4
+                                            if(i_OrbSpec%lang(ilval).eq.0) then
+                                               ! K1
+                                               naddA1      = 1
+                                               naddB1      = 1
+                                               add_A1(:,1) = [1,1,0]
+                                               add_B1(:,1) = [1,1,2]
+                                               ! K2
+                                               naddA2      = 1
+                                               naddB2      = 1
+                                               add_A2(:,1) = [1,1,2]
+                                               add_B2(:,1) = [1,1,0]
+
+                                            elseif(i_OrbSpec%lang(ilval).eq.1) then
+                                               ! K1
+                                               naddA1      = 2
+                                               naddB1      = 3
+                                               add_A1(:,1) = [0,1,1]
+                                               add_A1(:,2) = [2,1,1]
+                                               add_B1(:,1) = [0,1,1]
+                                               add_B1(:,2) = [2,1,1]
+                                               add_B1(:,3) = [2,1,3]
+                                               ! K2
+                                               naddA2      = 3
+                                               naddB2      = 2
+                                               add_A2(:,1) = [1,0,1]
+                                               add_A2(:,2) = [1,2,1]
+                                               add_A2(:,3) = [1,2,3]
+                                               add_B2(:,1) = [1,0,1]
+                                               add_B2(:,2) = [1,2,1]
+ 
+                                            endif
+                                          if(iPairGen.eq.4) then
+                                             ilmax = 1 
+                                             jlmax = 2
+                                          elseif(iPairGen.eq.5) then
+                                             ilmax = 2
+                                             jlmax = 1
+                                          endif
+
+                                         end select
+                                      endif
+
+                              sum_TOT = &
+                                   maxOmega_PairReduced(iPairSpecG) + &
+                                   maxOmega_PairReduced(jPairSpecG) + &
+                                   i_OrbSpec%max_lrange(ilval) + &
+                                   j_OrbSpec%max_lrange(jlval) + &
+                                   add_lval
+
+                              max_2 = max(&
+                                   maxt_PairReduced(iPairSpecG),&
+                                   maxt_PairReduced(jPairSpecG))
+
+                              imax = maxuv_PairReduced(iPairSpecG) + ilmax
+                              jmax = maxuv_PairReduced(jPairSpecG) + jlmax
+
+                              max_1 = max(&
+                                   imax + j_OrbSpec%max_lrange(jlval),&
+                                   imax + jmax,&
+                                   i_OrbSpec%max_lrange(ilval) + jmax)
+
+                              ! K1
+                              ! A-part 
+                              order2 = [0,-1,0]
+                              call perm_part1(iThree,perm1,perm2,order2,&
+                                   iPairSpec%iexp1,j_OrbSpec%iexp,&
+                                   iPairSpec%iexp2,jPairSpec%iexp2,&
+                                   i_OrbSpec%iexp ,jPairSpec%iexp1)
+                              do iadd=1,naddA1
+                                 call add_K_Spec(iThree,&
+                                      add_A1(perm1(1),iadd),& 
+                                      add_A1(perm1(2),iadd),&
+                                      add_A1(perm1(3),iadd),&
+                                      minloc(order2,dim=1),&
+                                      sum_TOT-sum(add_A1(:,iadd)),&
+                                      max_2,max_1-minval(add_A1(:,iadd)))
+                              enddo
+
+                              ! B-part
+                              order2 = [0,-1,0]
+                              call perm_part1(iThree,perm1,perm2,order2,&
+                                   iPairSpec%iexp1,j_OrbSpec%iexp,&
+                                   iPairSpec%iexp2,jPairSpec%iexp1,&
+                                   i_OrbSpec%iexp ,jPairSpec%iexp2)
+                              do iadd=1,naddB1     
+                                 call add_K_Spec(iThree,&
+                                      add_B1(perm1(1),iadd),& 
+                                      add_B1(perm1(2),iadd),&
+                                      add_B1(perm1(3),iadd),&
+                                      minloc(order2,dim=1),&
+                                      sum_TOT-sum(add_B1(:,iadd)),&
+                                      max_2,max_1-minval(add_B1(:,iadd)))
+                              enddo          
+
+                              ! K2
+                              ! A-part 
+                              order2 = [0,0,-1]
+                              call perm_part1(iThree,perm1,perm2,order2,&
+                                   iPairSpec%iexp1,jPairSpec%iexp1,&
+                                   iPairSpec%iexp2,j_OrbSpec%iexp,&
+                                   i_OrbSpec%iexp ,jPairSpec%iexp2)
+                              do iadd=1,naddA2
+                                 call add_K_Spec(iThree,&
+                                      add_A2(perm1(1),iadd),& 
+                                      add_A2(perm1(2),iadd),&
+                                      add_A2(perm1(3),iadd),&
+                                      minloc(order2,dim=1),&
+                                      sum_TOT-sum(add_A2(:,iadd)),&
+                                      max_2,max_1-minval(add_A2(:,iadd)))
+                              enddo        
 !
-!                      sum_TOT = &
-!                           maxOmega_PairReduced(iPairSpec) + &
-!                           maxOmega_PairReduced(jPairSpec) + &
-!                           i_OrbSpec%maxrange + &
-!                           j_OrbSpec%maxrange
-!
-!                      max_2 = max(&
-!                           maxt_PairReduced(iPairSpec),&
-!                           maxt_PairReduced(jPairSpec))
-!
-!                      imax = maxuv_PairReduced(iPairSpec)
-!                      jmax = maxuv_PairReduced(jPairSpec)
-!
-!                      max_1 = max(&
-!                           imax + j_OrbSpec%maxrange,&
-!                           imax + jmax,&
-!                           i_OrbSpec%maxrange + jmax)
-!
-!                      order2 = [0,-1,0]
-!                      call perm_part1(iThree,perm1,perm2,order2,&
-!                           iPairSpec%iexp1,j_OrbSpec%iexp,&
-!                           iPairSpec%iexp2,jPairSpec%iexp2,&
-!                           i_OrbSpec%iexp ,jPairSpec%iexp1)
-!                      call add_K_Spec(iThree,minloc(order2,dim=1),&
-!                           sum_TOT,max_2,max_1)
-!
-!                      order2 = [0,-1,0]
-!                      call perm_part1(iThree,perm1,perm2,order2,&
-!                           iPairSpec%iexp1,j_OrbSpec%iexp,&
-!                           iPairSpec%iexp2,jPairSpec%iexp1,&
-!                           i_OrbSpec%iexp ,jPairSpec%iexp2)
-!                      call add_K_Spec(iThree,minloc(order2,dim=1),&
-!                           sum_TOT,max_2,max_1)
-!
-!                      order2 = [0,0,-1]
-!                      call perm_part1(iThree,perm1,perm2,order2,&
-!                           iPairSpec%iexp1,jPairSpec%iexp1,&
-!                           iPairSpec%iexp2,j_OrbSpec%iexp,&
-!                           i_OrbSpec%iexp ,jPairSpec%iexp2)
-!                      call add_K_Spec(iThree,minloc(order2,dim=1),&
-!                           sum_TOT,max_2,max_1)
-!
-!                      order2 = [0,0,-1]
-!                      call perm_part1(iThree,perm1,perm2,order2,&
-!                           iPairSpec%iexp1,jPairSpec%iexp2,&
-!                           iPairSpec%iexp2,j_OrbSpec%iexp,&
-!                           i_OrbSpec%iexp ,jPairSpec%iexp1)
-!                      call add_K_Spec(iThree,minloc(order2,dim=1),&
-!                           sum_TOT,max_2,max_1)
-!
-!                   endif
-!                 end associate
-!              enddo
-!           enddo
-!
-!        endif
-!      end associate
-!   enddo
-!enddo
+                              ! B-part 
+                              order2 = [0,0,-1]
+                              call perm_part1(iThree,perm1,perm2,order2,&
+                                   iPairSpec%iexp1,jPairSpec%iexp2,&
+                                   iPairSpec%iexp2,j_OrbSpec%iexp,&
+                                   i_OrbSpec%iexp ,jPairSpec%iexp1)
+                              do iadd=1,naddB2
+                                 call add_K_Spec(iThree,&
+                                      add_B2(perm1(1),iadd),& 
+                                      add_B2(perm1(2),iadd),&
+                                      add_B2(perm1(3),iadd),&
+                                      minloc(order2,dim=1),&
+                                      sum_TOT-sum(add_B2(:,iadd)),&
+                                      max_2,max_1-minval(add_B2(:,iadd)))
+                              enddo        
+
+                                    endif
+                                 enddo
+                              enddo
+
+                            endif
+                         end associate
+                      enddo
+                   enddo
+
+                    end associate
+                 enddo
+              end associate
+           enddo
+        endif
+      end associate
+   enddo
+enddo
+
+call mem_dealloc(jGenNum)
 
 end subroutine init_K_ThreeInt
 
@@ -1228,34 +1507,86 @@ end associate
 
 end subroutine add_J_Spec
 
-subroutine add_K_Spec(iThree,ij,sum_TOT,max_2,max_1)
+subroutine add_K_Spec(iThree,lam1,lam2,lam3,ij,sum_TOT,max_2,max_1)
 implicit none
 integer,intent(in) :: iThree,ij
+integer,intent(in) :: lam1,lam2,lam3 
 integer,intent(in) :: sum_TOT,max_2,max_1
+integer :: ival,l1val,l2val,l3val
 
 associate(Three => ThreeInt(iThree))
-
+!
   if(.not.Three%isUsed_K) then
 
      allocate(Three%K_Spec(3))
+!
+!     Three%K_Spec(1) = K_SpecData(.false.,'12',0,0,0)
+!     Three%K_Spec(2) = K_SpecData(.false.,'13',0,0,0)
+!     Three%K_Spec(3) = K_SpecData(.false.,'23',0,0,0)
+!
+     ! initialize
+     do ival=1,size(Three%K_Spec)
+        associate(Spec => Three%K_Spec(ival))
 
-     Three%K_Spec(1) = K_SpecData(.false.,'12',0,0,0)
-     Three%K_Spec(2) = K_SpecData(.false.,'13',0,0,0)
-     Three%K_Spec(3) = K_SpecData(.false.,'23',0,0,0)
+          ! init KSpec
+          Spec%isUsed = .false.
+          select case(ival)
+          case(1)
+             Spec%symbol_ij = '12'
+          case(2)
+             Spec%symbol_ij = '13'
+          case(3)
+             Spec%symbol_ij = '23'
+          end select
 
-     Three%isUsed_K = .true.
+          ! init KSpecLam
+          do l1val=0,3
+             do l2val=0,3
+                do l3val=0,3
+                  associate(LSpec => Spec%K_SpecLam(l1val,l2val,l3val))
+
+                    LSpec%isUsed = .false.
+                    LSpec%sum_TOT = 0
+                    LSpec%max_2   = 0
+                    LSpec%max_1   = 0
+
+                  end associate
+                enddo
+             enddo
+          enddo
+
+        end associate
+     enddo
+
+      Three%isUsed_K = .true.
 
   endif
-
+!
   associate(Spec => Three%K_Spec(ij))
+    associate(LSpec => Spec%K_SpecLam(lam1,lam2,lam3))
 
-    Spec%sum_TOT = max(Spec%sum_TOT,sum_TOT)
-    Spec%max_2   = max(Spec%max_2  ,max_2)
-    Spec%max_1   = max(Spec%max_1  ,max_1)
+      LSpec%sum_TOT = max(LSpec%sum_TOT,sum_TOT)
+      LSpec%max_2   = max(LSpec%max_2,  max_2)
+      LSpec%max_1   = max(LSpec%max_1,  max_1)
+
+      LSpec%isUsed = .true. 
+      
+    end associate
 
     Spec%isUsed = .true.
 
   end associate
+!
+! hapka: old_drake
+!  associate(Spec => Three%K_Spec(ij))
+!
+!    Spec%sum_TOT = max(Spec%sum_TOT,sum_TOT)
+!    Spec%max_2   = max(Spec%max_2  ,max_2)
+!    Spec%max_1   = max(Spec%max_1  ,max_1)
+!
+!    Spec%isUsed = .true.
+!
+!  end associate
 
 end associate
 
@@ -1807,27 +2138,27 @@ integer :: i1,i2,i3,i12,ix3
 character(3) :: permute_string
 procedure(),pointer :: permute_indices_1,permute_indices_2
 
-if(.not.ThreeInt(iThree)%isUsed_K) then
-   write(LOUT,'(a)') 'ERROR!!! &
-        &An entry incorrectly predicted as not necessary for K integrals!'
-   stop
-endif
-associate(Spec => ThreeInt(iThree)%K_Spec(ij))
-  if(.not.Spec%isUsed) then
-     write(LOUT,'(a)') 'ERROR!!! &
-          &An ordering incorrectly predicted as not necessary for K integrals!'
-     stop
-  endif
-  if(sum_TOT>Spec%sum_TOT.or.max_2>Spec%max_2.or.max_1>Spec%max_1) then
-     write(LOUT,'(a)') 'ERROR!!! &
-          &Ranges of 3-electron K integrals have been predicted incorrectly!'
-     stop
-  endif
-end associate
-if(perm2(3)==1) then
-   write(LOUT,'(a)') 'ERROR!!! Unexpected permutation for K integrals!'
-   stop
-endif
+!if(.not.ThreeInt(iThree)%isUsed_K) then
+!   write(LOUT,'(a)') 'ERROR!!! &
+!        &An entry incorrectly predicted as not necessary for K integrals!'
+!   stop
+!endif
+!associate(Spec => ThreeInt(iThree)%K_Spec(ij))
+!  if(.not.Spec%isUsed) then
+!     write(LOUT,'(a)') 'ERROR!!! &
+!          &An ordering incorrectly predicted as not necessary for K integrals!'
+!     stop
+!  endif
+!  if(sum_TOT>Spec%sum_TOT.or.max_2>Spec%max_2.or.max_1>Spec%max_1) then
+!     write(LOUT,'(a)') 'ERROR!!! &
+!          &Ranges of 3-electron K integrals have been predicted incorrectly!'
+!     stop
+!  endif
+!end associate
+!if(perm2(3)==1) then
+!   write(LOUT,'(a)') 'ERROR!!! Unexpected permutation for K integrals!'
+!   stop
+!endif
 
 select case(extra)
 case(0)
@@ -2030,7 +2361,7 @@ subroutine print_ThreeInt(LPRINT)
 implicit none
 integer,intent(in) :: LPRINT
 integer :: iThree,ij
-integer :: ilam
+integer :: ilam,l1val,l2val,l3val
 
 !if(LPRINT>=10) then
 
@@ -2065,7 +2396,7 @@ integer :: ilam
                          associate(LSpec => Spec%J_SpecLam(ilam))
                            if(LSpec%isUsed) then
                            write(LOUT,'(12x,a,i3,3(2x,3a,i3))') &
-                           'ilam = ',ilam, & 
+                           'lam = ',ilam, & 
                            'sum_',Spec%symbol_ij,'  = ',LSpec%sum_ij,&
                            'max_',Spec%symbol_ij,' = ',LSpec%max_ij,&
                            'max_',Spec%symbol_k,' = ',LSpec%max_k
@@ -2082,20 +2413,43 @@ integer :: ilam
                  end associate
               enddo
            endif
-!           if(Three%isUsed_K) then
-!              write(LOUT,'(8x,a,i1)') 'K: ',count(Three%K_Spec(:)%isUsed)
-!              do ij=1,3
-!                 associate(Spec => Three%K_Spec(ij))
-!                   if(Spec%isUsed) then
+           if(Three%isUsed_K) then
+              write(LOUT,'(8x,a,i1)') 'K: ',count(Three%K_Spec(:)%isUsed)
+              do ij=1,3
+                 associate(Spec => Three%K_Spec(ij))
+                   if(Spec%isUsed) then
+!                      write(LOUT,'(12x,2a,3(2x,a,i3))') &
+
+                      write(LOUT,'(12x,2a)') &
+                           'symbol:',Spec%symbol_ij
+                      write(LOUT,'(12x,a)') &
+                           ' (l1,l2,l3)'
+                      do l3val=0,3
+                         do l2val=0,3
+                            do l1val=0,3
+
+                               associate(LSpec => Spec%K_SpecLam(l1val,l2val,l3val))
+                                 if(LSpec%isUsed) then
+                                    write(LOUT,'(12x,3i3,3(2x,a,i3))') &
+                                    l1val,l2val,l3val, &
+                                    'sum_TOT = ',LSpec%sum_TOT,&
+                                    'max_ij = ',LSpec%max_2,&
+                                    'max_i = ',LSpec%max_1
+!
 !                      write(LOUT,'(12x,2a,3(2x,a,i3))') &
 !                           'symbol:',Spec%symbol_ij,&
 !                           'sum_TOT = ',Spec%sum_TOT,&
 !                           'max_ij = ',Spec%max_2,&
 !                           'max_i = ',Spec%max_1
-!                   endif
-!                 end associate
-!              enddo
-!           endif
+                                 endif
+                               end associate
+                            enddo
+                         enddo
+                      enddo    
+                   endif
+                 end associate
+              enddo
+           endif
            write(LOUT,'()')
         else
            write(LOUT,'(a)') 'NOT USED'
