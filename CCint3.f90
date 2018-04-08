@@ -24,7 +24,7 @@ character :: int3_source
 character(*),parameter :: script = 'script.sh'
 character(*),parameter :: infile = 'ThreeElectron.in'
 character(*),parameter :: core_J = 'intJ', core_K = 'intK'
-integer,parameter :: name_length = 20
+integer,parameter :: name_length  = 20
 
 integer,parameter :: smallest_uv = 0
 integer,parameter :: offset_uv = 1 - smallest_uv
@@ -92,7 +92,7 @@ call init_K_ThreeInt(OrbReduced,PairReduced)
 
 call print_ThreeInt(LPRINT)
 
-!call create_ThreeInt
+call create_ThreeInt
 
 end subroutine create_CCint3
 
@@ -1821,153 +1821,104 @@ integer :: iThree,ij
 integer :: iunit
 integer :: perm1(3),perm2(3),order2(3)
 real(prec) :: alpha(3)
-character(name_length) :: name_J1,name_J2,name_K0,name_K1
+character(name_length) :: name_J1,name_J2
+character(name_length) :: name_K0,name_K1
+integer :: nJ, nK, ip, ilam, l1val, l2val, l3val
 
 call execute_command_line('rm -f '//core_J//'* '//core_K//'*')
 
-!select case(int3_source)
-!case('L')
-!
-!   do iThree=1,size(ThreeInt)
-!      associate(Three => ThreeInt(iThree))
-!
-!        if(Three%isUsed_J) then
-!           do ij=1,3
-!              associate(Spec => Three%J_Spec(ij))
-!                if(Spec%isUsed) then
-!
-!                   name_J1 = prepare_name(core_J,iThree,ij,1)
-!                   name_J2 = prepare_name(core_J,iThree,ij,2)
-!
-!                   perm1 = [1,2,3]
-!                   perm2 = [1,2,3]
-!                   order2 = 0
-!                   order2(ij) = 1
-!                   call perm_part2(perm1,perm2,order2)
-!                   alpha = permuted_alpha(Three,perm1)
-!
-!                   open(newunit=iunit,file=infile)
-!                   write(iunit,'(3es23.15,2x,a1,2x,3i5)') alpha,'J',&
-!                        Spec%sum_ij,Spec%max_ij,Spec%max_k
-!                   close(iunit)
-!                   call execute_command_line(&
-!                        'bash '//script//' L '//infile//' J '//trim(name_J1))
-!
-!                   if(permuted_same12(Three,perm2)) then
-!
-!                      call execute_command_line('cp '//&
-!                           trim(name_J1)//' '//trim(name_J2))
-!
-!                   else
-!
-!                      call swap(alpha(1),alpha(2))
-!
-!                      open(newunit=iunit,file=infile)
-!                      write(iunit,'(3es23.15,2x,a1,2x,3i5)') alpha,'J',&
-!                           Spec%sum_ij,Spec%max_ij,Spec%max_k
-!                      close(iunit)
-!                      call execute_command_line(&
-!                           'bash '//script//' L '//infile//' J '//trim(name_J2))
-!
-!                   endif
-!
-!                endif
-!              end associate
-!           enddo
-!        endif
-!
-!        if(Three%isUsed_K) then
-!           do ij=1,3
-!              associate(Spec => Three%K_Spec(ij))
-!                if(Spec%isUsed) then
-!
-!                   name_K0 = prepare_name(core_K,iThree,ij,0)
-!                   name_K1 = prepare_name(core_K,iThree,ij,1)
-!
-!                   perm1 = [1,2,3]
-!                   perm2 = [1,2,3]
-!                   order2 = 0
-!                   order2(ij) = -1
-!                   call perm_part2(perm1,perm2,order2)
-!                   alpha = permuted_alpha(Three,perm1)
-!
-!                   open(newunit=iunit,file=infile)
-!                   write(iunit,'(3es23.15,2x,a1,2x,3i5)') alpha,'K',&
-!                        Spec%sum_TOT,Spec%max_2,Spec%max_1
-!                   close(iunit)
-!                   call execute_command_line(&
-!                        'bash '//script//' L '//infile//' K '//&
-!                        trim(name_K0)//' '//trim(name_K1))
-!
-!                endif
-!              end associate
-!           enddo
-!        endif
-!
-!      end associate
-!   enddo
-!
-!case('P','Q')
-!
-!   do iThree=1,size(ThreeInt)
-!      associate(Three => ThreeInt(iThree))
-!
-!        open(newunit=iunit,file=infile)
-!        write(iunit,'(3es23.15)') Three%ijalpha,Three%klalpha,Three%mnalpha
-!
-!        if(Three%isUsed_J) then
-!           write(iunit,'(i1)') count(Three%J_Spec(:)%isUsed)
-!           do ij=1,3
-!              associate(Spec => Three%J_Spec(ij))
-!                if(Spec%isUsed) then
-!
-!                   name_J1 = prepare_name(core_J,iThree,ij,1)
-!                   name_J2 = prepare_name(core_J,iThree,ij,2)
-!
-!                   write(iunit,'(a2,2x,3i5,2(2x,a))') Spec%symbol_ij,&
-!                        Spec%sum_ij,Spec%max_ij,Spec%max_k,&
-!                        trim(name_J1),trim(name_J2)
-!
-!                endif
-!              end associate
-!           enddo
-!        else
-!           write(iunit,'(i1)') 0
-!        endif
-!
-!        if(Three%isUsed_K) then
-!           write(iunit,'(i1)') count(Three%K_Spec(:)%isUsed)
-!           do ij=1,3
-!              associate(Spec => Three%K_Spec(ij))
-!                if(Spec%isUsed) then
-!
-!                   name_K0 = prepare_name(core_K,iThree,ij,0)
-!                   name_K1 = prepare_name(core_K,iThree,ij,1)
-!
-!                   write(iunit,'(a2,2x,3i5,2(2x,a))') Spec%symbol_ij,&
-!                        Spec%sum_TOT,Spec%max_2,Spec%max_1,&
-!                        trim(name_K0),trim(name_K1)
-!
-!                endif
-!              end associate
-!           enddo
-!        else
-!           write(iunit,'(i1)') 0
-!        endif
-!
-!        close(iunit)
+select case(int3_source)
+case('P','Q')
+
+   do iThree=1,size(ThreeInt)
+      associate(Three => ThreeInt(iThree))
+
+        open(newunit=iunit,file=infile)
+        write(iunit,'(3es23.15)') Three%ijalpha,Three%klalpha,Three%mnalpha
+
+        if(Three%isUsed_J) then
+!          write(iunit,'(i1)') count(Three%J_Spec(:)%isUsed)
+           nJ = 0
+           do ip=1,size(Three%J_Spec)
+              if(Three%J_Spec(ip)%isUsed) then
+                 nJ = nJ + count(Three%J_Spec(ip)%J_SpecLam(:)%isUsed)
+              endif
+           enddo
+           write(iunit,'(i1)') nJ 
+
+           do ij=1,3
+              associate(Spec => Three%J_Spec(ij))
+              do ilam=0,2
+                 associate(LSpec => Spec%J_SpecLam(ilam))
+                   if(LSpec%isUsed) then
+
+                      name_J1 = prepare_name_J(core_J,iThree,ij,ilam,1)
+                      name_J2 = prepare_name_J(core_J,iThree,ij,ilam,2)
+
+                      write(iunit,'(a2,2x,4i5,2(2x,a))') Spec%symbol_ij,&
+                           ilam,&
+                           LSpec%sum_ij,LSpec%max_ij,LSpec%max_k,&
+                           trim(name_J1),trim(name_J2)
+
+                   endif
+                 end associate
+              enddo
+               end associate
+           enddo
+        else
+           write(iunit,'(i1)') 0
+        endif
+
+        if(Three%isUsed_K) then
+!          write(iunit,'(i1)') count(Three%K_Spec(:)%isUsed)
+           nK = 0
+           do ip=1,size(Three%K_Spec)
+              if(Three%K_Spec(ip)%isUsed) then
+                 nK = nK + count(Three%K_Spec(ip)%K_SpecLam(:,:,:)%isUsed)
+              endif
+           enddo
+           write(iunit,'(i3)') nK
+
+           do ij=1,3
+              associate(Spec => Three%K_Spec(ij))
+                do l3val=0,3
+                   do l2val=0,3
+                      do l1val=0,3
+                         associate(LSpec => Spec%K_SpecLam(l1val,l2val,l3val))
+                           if(LSpec%isUsed) then
+
+                              name_K0 = prepare_name_K(core_K,iThree,ij,l1val,l2val,l3val,0)
+                              name_K1 = prepare_name_K(core_K,iThree,ij,l1val,l2val,l3val,1)
+
+                              write(iunit,'(a2,2x,6i5,2(2x,a))') Spec%symbol_ij,&
+                               l1val,l2val,l3val,&
+                               LSpec%sum_TOT,LSpec%max_2,LSpec%max_1,&
+                               trim(name_K0),trim(name_K1)
+
+                           endif
+                         end associate
+                      enddo
+                   enddo
+                enddo
+              end associate
+           enddo
+        else
+           write(iunit,'(i1)') 0
+        endif
+
+        close(iunit)
 !        call execute_command_line(&
 !             'bash '//script//' '//int3_source//' '//infile)
-!
-!      end associate
-!   enddo
-!
-!case default
-!
-!   write(LOUT,'(a)') 'ERROR!!! Unrecognizable source of 3-el integrals!'
-!   stop
-!
-!end select
+
+      end associate
+   enddo
+
+case default
+
+   write(LOUT,'(a)') 'ERROR!!! Unrecognizable source of 3-el integrals!'
+   stop
+
+end select
 
 end subroutine create_ThreeInt
 
@@ -2011,81 +1962,81 @@ procedure(),pointer :: permute_indices
 !   write(LOUT,'(a)') 'ERROR!!! Unexpected permutation for J integrals!'
 !   stop
 !endif
-
-select case(extra)
-case(1)
-
-   extra_name = merge(1,2,perm2(2)<perm2(3))
-   permute_indices => permute12
-
-case(2)
-
-   extra_name = merge(2,1,perm2(2)<perm2(3))
-   permute_indices => permute21
-
-case default
-
-   write(LOUT,'(a)') 'ERROR!!! Incorrect extra parameter for J integrals!'
-   stop
-
-end select
-
-allocate(int3val(0:max_12))
-
-do t=0,max_12
-   range_uv = sum_12 - t
-   call mem_alloc(int3val(t)%elms,&
-        max_3    - smallest_uv + 1,&
-        range_uv - smallest_uv + 1,&
-        range_uv - smallest_uv + 1)
-   int3val(t)%elms = 0._prec
-enddo
-
-name_J = prepare_name(core_J,iThree,ij,extra_name)
-
-open(newunit=iunit,file=name_J,access='stream')
-select case(int3_source)
-case('L')
-
-   do
-      read(iunit,iostat=stat) idx,val2
-      if(stat/=0) exit
-      if(idx(4)>max_12) cycle
-      if(idx(3)>max_3) cycle
-      if(any(idx(1:2)>sum_12-idx(4))) cycle
-
-      call permute_indices
-      int3val(i12)%elms(&
-           offset_uv + i3, &
-           offset_uv + i1, &
-           offset_uv + i2) = val2*val_modifier
-
-   enddo
-
-case('P','Q')
-
-   do
-      read(iunit,iostat=stat) idx,val4
-      if(stat/=0) exit
-      if(idx(4)>max_12) cycle
-      if(idx(3)>max_3) cycle
-      if(any(idx(1:2)>sum_12-idx(4))) cycle
-
-      call permute_indices
-      int3val(i12)%elms(&
-           offset_uv + i3, &
-           offset_uv + i1, &
-           offset_uv + i2) = val4
-
-   enddo
-
-case default
-
-   write(LOUT,'(a)') 'ERROR!!! Unrecognizable source of 3-el integrals!'
-   stop
-
-end select
-close(iunit)
+!
+!select case(extra)
+!case(1)
+!
+!   extra_name = merge(1,2,perm2(2)<perm2(3))
+!   permute_indices => permute12
+!
+!case(2)
+!
+!   extra_name = merge(2,1,perm2(2)<perm2(3))
+!   permute_indices => permute21
+!
+!case default
+!
+!   write(LOUT,'(a)') 'ERROR!!! Incorrect extra parameter for J integrals!'
+!   stop
+!
+!end select
+!
+!allocate(int3val(0:max_12))
+!
+!do t=0,max_12
+!   range_uv = sum_12 - t
+!   call mem_alloc(int3val(t)%elms,&
+!        max_3    - smallest_uv + 1,&
+!        range_uv - smallest_uv + 1,&
+!        range_uv - smallest_uv + 1)
+!   int3val(t)%elms = 0._prec
+!enddo
+!
+!name_J = prepare_name(core_J,iThree,ij,extra_name)
+!
+!open(newunit=iunit,file=name_J,access='stream')
+!select case(int3_source)
+!case('L')
+!
+!   do
+!      read(iunit,iostat=stat) idx,val2
+!      if(stat/=0) exit
+!      if(idx(4)>max_12) cycle
+!      if(idx(3)>max_3) cycle
+!      if(any(idx(1:2)>sum_12-idx(4))) cycle
+!
+!      call permute_indices
+!      int3val(i12)%elms(&
+!           offset_uv + i3, &
+!           offset_uv + i1, &
+!           offset_uv + i2) = val2*val_modifier
+!
+!   enddo
+!
+!case('P','Q')
+!
+!   do
+!      read(iunit,iostat=stat) idx,val4
+!      if(stat/=0) exit
+!      if(idx(4)>max_12) cycle
+!      if(idx(3)>max_3) cycle
+!      if(any(idx(1:2)>sum_12-idx(4))) cycle
+!
+!      call permute_indices
+!      int3val(i12)%elms(&
+!           offset_uv + i3, &
+!           offset_uv + i1, &
+!           offset_uv + i2) = val4
+!
+!   enddo
+!
+!case default
+!
+!   write(LOUT,'(a)') 'ERROR!!! Unrecognizable source of 3-el integrals!'
+!   stop
+!
+!end select
+!close(iunit)
 
 contains
 
@@ -2159,103 +2110,103 @@ procedure(),pointer :: permute_indices_1,permute_indices_2
 !   write(LOUT,'(a)') 'ERROR!!! Unexpected permutation for K integrals!'
 !   stop
 !endif
-
-select case(extra)
-case(0)
-
-   start_2 = -1
-
-case(1)
-
-   start_2 = 0
-
-case default
-
-   write(LOUT,'(a)') 'ERROR!!! Incorrect extra parameter for K integrals!'
-   stop
-
-end select
-
-if(perm2(1)==1) then
-   permute_indices_2 => permute12
-else
-   permute_indices_2 => permute21
-endif
-
-write(permute_string,'(3i1)') perm1
-select case(permute_string)
-case('123')
-   permute_indices_1 => permute123
-case('213')
-   permute_indices_1 => permute213
-case('132')
-   permute_indices_1 => permute132
-case('312')
-   permute_indices_1 => permute312
-case('231')
-   permute_indices_1 => permute231
-case('321')
-   permute_indices_1 => permute321
-case default
-   write(LOUT,'(a)') 'ERROR!!! Impossible permutation of K integrals!'
-   stop
-end select
-
-allocate(int3val(start_2:max_2,start_2:max_2))
-
-range_1 = max_1 - smallest_uv + 1
-do ix3=start_2,max_2
-   do i12=start_2,max_2
-      call mem_alloc(int3val(i12,ix3)%elms,range_1,range_1,range_1)
-      int3val(i12,ix3)%elms = 0._prec
-   enddo
-enddo
-
-name_K = prepare_name(core_K,iThree,ij,extra)
-
-open(newunit=iunit,file=name_K,access='stream')
-select case(int3_source)
-case('L')
-
-   do
-      read(iunit,iostat=stat) idx,val2
-      if(stat/=0) exit
-      if(any(idx(4:5)>max_2)) cycle
-      if(any(idx(1:3)>max_1)) cycle
-
-      call permute_indices_2
-      call permute_indices_1
-      int3val(i12,ix3)%elms(&
-           offset_uv + i1, &
-           offset_uv + i2, &
-           offset_uv + i3) = val2*val_modifier
-
-   enddo
-
-case('P','Q')
-
-   do
-      read(iunit,iostat=stat) idx,val4
-      if(stat/=0) exit
-      if(any(idx(4:5)>max_2)) cycle
-      if(any(idx(1:3)>max_1)) cycle
-
-      call permute_indices_2
-      call permute_indices_1
-      int3val(i12,ix3)%elms(&
-           offset_uv + i1, &
-           offset_uv + i2, &
-           offset_uv + i3) = val4
-
-   enddo
-
-case default
-
-   write(LOUT,'(a)') 'ERROR!!! Unrecognizable source of 3-el integrals!'
-   stop
-
-end select
-close(iunit)
+!
+!select case(extra)
+!case(0)
+!
+!   start_2 = -1
+!
+!case(1)
+!
+!   start_2 = 0
+!
+!case default
+!
+!   write(LOUT,'(a)') 'ERROR!!! Incorrect extra parameter for K integrals!'
+!   stop
+!
+!end select
+!
+!if(perm2(1)==1) then
+!   permute_indices_2 => permute12
+!else
+!   permute_indices_2 => permute21
+!endif
+!
+!write(permute_string,'(3i1)') perm1
+!select case(permute_string)
+!case('123')
+!   permute_indices_1 => permute123
+!case('213')
+!   permute_indices_1 => permute213
+!case('132')
+!   permute_indices_1 => permute132
+!case('312')
+!   permute_indices_1 => permute312
+!case('231')
+!   permute_indices_1 => permute231
+!case('321')
+!   permute_indices_1 => permute321
+!case default
+!   write(LOUT,'(a)') 'ERROR!!! Impossible permutation of K integrals!'
+!   stop
+!end select
+!
+!allocate(int3val(start_2:max_2,start_2:max_2))
+!
+!range_1 = max_1 - smallest_uv + 1
+!do ix3=start_2,max_2
+!   do i12=start_2,max_2
+!      call mem_alloc(int3val(i12,ix3)%elms,range_1,range_1,range_1)
+!      int3val(i12,ix3)%elms = 0._prec
+!   enddo
+!enddo
+!
+!name_K = prepare_name(core_K,iThree,ij,extra)
+!
+!open(newunit=iunit,file=name_K,access='stream')
+!select case(int3_source)
+!case('L')
+!
+!   do
+!      read(iunit,iostat=stat) idx,val2
+!      if(stat/=0) exit
+!      if(any(idx(4:5)>max_2)) cycle
+!      if(any(idx(1:3)>max_1)) cycle
+!
+!      call permute_indices_2
+!      call permute_indices_1
+!      int3val(i12,ix3)%elms(&
+!           offset_uv + i1, &
+!           offset_uv + i2, &
+!           offset_uv + i3) = val2*val_modifier
+!
+!   enddo
+!
+!case('P','Q')
+!
+!   do
+!      read(iunit,iostat=stat) idx,val4
+!      if(stat/=0) exit
+!      if(any(idx(4:5)>max_2)) cycle
+!      if(any(idx(1:3)>max_1)) cycle
+!
+!      call permute_indices_2
+!      call permute_indices_1
+!      int3val(i12,ix3)%elms(&
+!           offset_uv + i1, &
+!           offset_uv + i2, &
+!           offset_uv + i3) = val4
+!
+!   enddo
+!
+!case default
+!
+!   write(LOUT,'(a)') 'ERROR!!! Unrecognizable source of 3-el integrals!'
+!   stop
+!
+!end select
+!close(iunit)
 
 contains
 
@@ -2330,15 +2281,27 @@ deallocate(int3val)
 
 end subroutine free_ThreeInt_K
 
-function prepare_name(core,iThree,ij,extra) result(name)
+function prepare_name_J(core,iThree,ij,lambda,extra) result(name)
+implicit none
+character(name_length) :: name
+character(*),intent(in) :: core
+integer,intent(in) :: iThree,ij,extra,lambda
+
+write(name,'(a,"_",i6.6,"_",i1,"_",i1,"_",i1)') trim(core),iThree,ij,lambda,extra
+
+end function prepare_name_J
+
+function prepare_name_K(core,iThree,ij,l1,l2,l3,extra) result(name)
 implicit none
 character(name_length) :: name
 character(*),intent(in) :: core
 integer,intent(in) :: iThree,ij,extra
+integer,intent(in) :: l1,l2,l3
 
-write(name,'(a,"_",i6.6,"_",i1,"_",i1)') trim(core),iThree,ij,extra
+!write(name,'(a,"_",i6.6,"_",i1,"_",i1,"_",i1,"_",i1,"_",i1)') trim(core),iThree,ij,l1,l2,l3,extra
+write(name,'(a,"_",i6.6,"_",i1,"_",3i1,"_",i1)') trim(core),iThree,ij,l1,l2,l3,extra
 
-end function prepare_name
+end function prepare_name_K
 
 subroutine free_ThreeInt
 implicit none
@@ -2361,6 +2324,7 @@ subroutine print_ThreeInt(LPRINT)
 implicit none
 integer,intent(in) :: LPRINT
 integer :: iThree,ij
+integer :: ip,nJ,nK
 integer :: ilam,l1val,l2val,l3val
 
 !if(LPRINT>=10) then
@@ -2385,7 +2349,15 @@ integer :: ilam,l1val,l2val,l3val
                 merge('*',' ',Three%same12),&
                 merge('*',' ',Three%same23)
            if(Three%isUsed_J) then
-              write(LOUT,'(8x,a,i1)') 'J: ',count(Three%J_Spec(:)%isUsed)
+!              write(LOUT,'(8x,a,i1)') 'J: ',count(Three%J_Spec(:)%isUsed)
+              nJ = 0
+              do ip=1,size(Three%J_Spec)
+                 if(Three%J_Spec(ip)%isUsed) then
+                    nJ = nJ + count(Three%J_Spec(ip)%J_SpecLam(:)%isUsed)
+                 endif
+              enddo
+              write(LOUT,'(8x,a,i1)') 'J: ', nJ
+!              write(LOUT,'(8x,a,i1)') 'J: ',count(Three%J_Spec(:)%isUsed)
               do ij=1,3
                  associate(Spec => Three%J_Spec(ij))
                    if(Spec%isUsed) then
@@ -2414,7 +2386,14 @@ integer :: ilam,l1val,l2val,l3val
               enddo
            endif
            if(Three%isUsed_K) then
-              write(LOUT,'(8x,a,i1)') 'K: ',count(Three%K_Spec(:)%isUsed)
+              nK = 0
+              do ip=1,size(Three%K_Spec) 
+                 if(Three%K_Spec(ip)%isUsed) then
+                    nK = nK + count(Three%K_Spec(ip)%K_SpecLam(:,:,:)%isUsed)
+                 endif
+              enddo
+              write(LOUT,'(8x,a,i3)') 'K: ',nK
+!              write(LOUT,'(8x,a,i1)') 'K: ',count(Three%K_Spec(:)%isUsed)
               do ij=1,3
                  associate(Spec => Three%K_Spec(ij))
                    if(Spec%isUsed) then
